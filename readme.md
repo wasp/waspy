@@ -26,6 +26,7 @@ There are a lot of features missing.
 
 Features for beta:
 - [x]: HTTP Transport
+- [x]: Routing
 - [ ]: RabbitMQ transport
 - [ ]: Client library (for calling other services)
 - [ ]: HTTP client transport (with envvar service discovery)
