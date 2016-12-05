@@ -25,18 +25,18 @@ This project is currently in alpha state.
 There are a lot of features missing.
 
 Features for beta:
- - [x]: HTTP Transport
- - []: RabbitMQ transport
- - []: Client library (for calling other services)
- - []: HTTP client transport (with envvar service discovery)
- - []: RabbitMQ client transport
- - []: Figure out middleware
+- [x]: HTTP Transport
+- [ ]: RabbitMQ transport
+- [ ]: Client library (for calling other services)
+- [ ]: HTTP client transport (with envvar service discovery)
+- [ ]: RabbitMQ client transport
+- [ ]: Figure out middleware
  
 Wish List:
- - []: Transport classes for nats (nats.io)
- - []: Transport classes for kafka
- - []: pattern for synchronous "worker-tier"
- - []: decorators for adding routes
+- [ ]: Transport classes for nats (nats.io)
+- [ ]: Transport classes for kafka
+- [ ]: pattern for synchronous "worker-tier"
+- [ ]: decorators for adding routes
 
 ## License
 Apache-2.0
