@@ -1,5 +1,5 @@
 import traceback
-from typing import List
+from typing import List, Union, Iterable
 import asyncio
 
 from .webtypes import Request, Response, ResponseError
@@ -10,7 +10,7 @@ from .router import Router
 
 class Application:
     def __init__(self,
-                 transport: TransportABC=None,
+                 transport: Union[TransportABC, Iterable[TransportABC]]=None,
                  *,
                  middlewares: List[callable]=None,
                  default_headers=None,
@@ -18,26 +18,43 @@ class Application:
                  router: Router=None):
         if transport is None:
             transport = HTTPTransport()
+        if not isinstance(transport, tuple):
+            transport = transport,
         if middlewares is None:
             middlewares = []
         if router is None:
             router = Router()
         if default_headers is None:
-            default_headers = {}
+            default_headers = {'Server': 'wasp'}
         self.transport = transport
         self.middlewares = middlewares
         self.default_headers = default_headers
         self.debug = debug
         self.router = router
+        self.on_start = []
 
     def run(self):
         loop = asyncio.get_event_loop()
         # todo: Call on-startup hook
-        self.transport.listen(loop=loop)
+        for t in self.transport:
+            t.listen(loop=loop)
+
+        for coro in self.on_start:
+            loop.run_until_complete(coro(self))
 
         # todo: fork/add processes
-        self.transport.run(self, loop=loop)
-        # todo: Call on-shutdown hook
+        for t in self.transport:
+            t.start(self, loop=loop)
+        try:
+            loop.run_forever()
+        except KeyboardInterrupt:
+            print('Shutting down')
+
+            # todo: Call on-shutdown hook
+        for t in self.transport:
+            t.shutdown(loop=loop)
+
+        loop.close()
 
     async def handle_request(self, request: Request) -> Response:
         """

@@ -13,7 +13,13 @@ class TransportABC(ABC):
         pass
 
     @abstractmethod
-    async def run(self, app, *, loop):
-        """ This method runs the app - listening for
-        and receiving connections"""
+    async def start(self, app, *, loop):
+        """ This method does things needed before we run
+        Like "listen" but you get the app object,
+        and it happens after the fork
+        """
+        pass
+
+    @abstractmethod
+    async def shutdown(self, *, loop):
         pass

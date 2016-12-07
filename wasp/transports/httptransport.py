@@ -8,30 +8,43 @@ from ..webtypes import Request, Response
 from .transportabc import TransportABC
 
 
+class ClosedError(Exception):
+    """ Error for closed connections """
+
+
 class HTTPTransport(TransportABC):
     def __init__(self, port=8080):
         self.port = port
         self._app = None
+        self._server = None
 
     def listen(self, *, loop: asyncio.AbstractEventLoop):
         coro = asyncio.start_server(
             self.handle_incoming_request, '0.0.0.0', self.port, loop=loop)
-        loop.run_until_complete(coro)
+        self._server = loop.run_until_complete(coro)
 
-    def run(self, app, *, loop: asyncio.AbstractEventLoop):
+    def start(self, app, *, loop: asyncio.AbstractEventLoop):
         self._app = weakref.ref(app)()
-        loop.run_forever()
 
     async def handle_incoming_request(self, reader, writer):
         self._set_tcp_nodelay(writer)
         protocol = HttpProtocol(reader=reader, writer=writer)
 
-        request = await protocol.get_request()
-        response = await self._app.handle_request(request)
-
-        await protocol.send_response(response)
-
+        try:
+            while True:
+                request = await protocol.get_request()
+                response = await self._app.handle_request(request)
+                await protocol.send_response(response)
+                if protocol.conn.our_state is h11.MUST_CLOSE:
+                    break
+                protocol.conn.start_next_cycle()
+        except (ClosedError, ConnectionResetError):
+            pass
         writer.close()
+
+    def shutdown(self, *, loop):
+        self._server.close()
+        loop.run_until_complete(self._server.wait_closed())
 
     def _set_tcp_nodelay(self, writer):
         socket_ = writer._transport._sock
@@ -72,7 +85,10 @@ class HttpProtocol(asyncio.Protocol):
         await self.writer.drain()
 
     async def get_request(self) -> Request:
+
         event = await self.next_event()
+        if isinstance(event, h11.ConnectionClosed):
+            raise ClosedError
         headers = {name.decode('ascii'): value.decode('ascii')
                    for name, value in event.headers}
 
@@ -83,8 +99,6 @@ class HttpProtocol(asyncio.Protocol):
             query = target[1]
         except IndexError:
             query = None
-        content_type = headers.pop('content-type', None)
-        content_length = headers.pop('content-length', None)
         host = headers.pop('host', None)
         method = event.method.decode('ascii')
 
@@ -103,9 +117,6 @@ class HttpProtocol(asyncio.Protocol):
             path=path,
             body=body,
             host=host,
-            content_type=content_type,
-            charset=None,
-            content_length=content_length,
             correlation_id=None
         )
 
@@ -114,6 +125,5 @@ class HttpProtocol(asyncio.Protocol):
             event = self.conn.next_event()
             if event is h11.NEED_DATA:
                 await self._read()
-                continue
             else:
                 return event

@@ -40,9 +40,7 @@ class Request:
     def __init__(self, headers: dict = None,
                  path: str = None, correlation_id: str = None,
                  method: str = None, query_string: str = None,
-                 body: bytes=None, host: str = None,
-                 content_type: str = None, charset: str = None,
-                 content_length: int = None):
+                 body: bytes=None, host: str = None):
 
         if not headers:
             headers = dict()
@@ -50,14 +48,11 @@ class Request:
         self.headers = headers
         self.path = path
         self.correlation_id = correlation_id
-        self.method = Methods(method)
+        self.method = Methods(method.upper())
         self.query_string = query_string
         self._query_params = None
         self.body = body
         self.host = host
-        self.content_type = content_type
-        self.charset = charset
-        self.content_length = content_length
         self.path_params = {}
         self._handler = None
 

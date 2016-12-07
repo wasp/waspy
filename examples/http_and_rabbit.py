@@ -1,6 +1,6 @@
 
 from wasp import Application
-from wasp.transports import RabbitMQTransport
+from wasp.transports import RabbitMQTransport, HTTPTransport
 
 rabbit = RabbitMQTransport(
     url='127.0.0.1',  # requires rabbitmq running locally (docker?)
@@ -11,8 +11,9 @@ rabbit = RabbitMQTransport(
     password='guest',
     ssl=False
 )
+http = HTTPTransport(port=8080)
 
-app = Application(rabbit, debug=False)
+app = Application((http, rabbit), debug=False)
 
 async def on_startup(app):
     await rabbit.bind_to_exchange(exchange='amq.topic', routing_key='#')
