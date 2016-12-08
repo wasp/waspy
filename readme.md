@@ -18,7 +18,7 @@ http to using a message bus, or vice-versa. You could even listen on both
 at the same time without having to modify your code at all.
 
 ## Example
-Look at `examples/http_foo.py` for a quick example
+Look at `examples/` folder for some quick examples
 
 ## Alpha
 This project is currently in alpha state. 
@@ -28,10 +28,10 @@ Features for beta:
 - [x]: HTTP Transport
 - [x]: Routing
 - [x]: RabbitMQ transport
+- [x]: Support middlewares
 - [ ]: Client library (for calling other services)
 - [ ]: HTTP client transport (with envvar service discovery)
 - [ ]: RabbitMQ client transport
-- [ ]: Figure out middleware
  
 Wish List:
 - [ ]: Transport classes for nats (nats.io)

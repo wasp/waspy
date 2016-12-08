@@ -1,5 +1,5 @@
 
-from wasp import Application
+from wasp import Application, Response, Request
 from wasp.transports import RabbitMQTransport, HTTPTransport
 
 rabbit = RabbitMQTransport(
@@ -21,18 +21,35 @@ async def on_startup(app):
 
 app.on_start.append(on_startup)
 
+# middlewares
+async def foo_middleware_factory(app, handler):
+    async def middleware(request: Request):
+        # Do stuff before handler
+        #   dummy example of parsing a header and adding a property
+        auth_header = request.headers.get('auth', None)
+        request.is_authorized = auth_header is not None
 
-async def handle_hello(request):
-    return {'hello': 'world'}
+        # handle request
+        response = await handler(request)
 
-async def handle_foo(request):
+        # do stuff after handler
+        #   dummy example of adding a response header
+        response.header['set-auth'] = 'true'
+
+
+async def handle_hello(request: Request):
+    return {'hello': 'world'}  # return a dict, it gets parsed to json
+
+async def handle_foo(request: Request):
     fooid = request.path_params.get('fooid')
-    return {'foo': fooid}
+    return {'foo': fooid}, 202  # you can also return a status code
 
-async def handle_bar(request):
+async def handle_bar(request: Request) -> Response:
     fooid = request.path_params.get('fooid')
     barid = request.query.get('bar')
-    return {'foo': fooid, 'bar': barid}
+    return Response(body={'foo': fooid, 'bar': barid})
+        # or you can return a response object to include more info
+        # such as headers
 
 app.router.add_static_route('get', '/hello', handle_hello)
 app.router.add_get('/foo/:fooid', handle_foo)

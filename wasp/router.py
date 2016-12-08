@@ -38,15 +38,26 @@ def _parameterize_path(path):
 class Router:
     def __init__(self):
         self._routes = {}
+        """
+        Routes looks like:
+        {method: {path: (handler, params)}} before startup and
+        {method: {path: (wrapped, handler, params)}} after startup
+        """
         self._static_routes = {}
+        """
+        Static routes look similar to routes, but with only a handler, no tuple
+        {method: {path: handler}}
+        """
         self.route_prefix = ''
 
-    def _prepare_route(self, route):
-        # ToDo: actually implement this
-        #  right now this only works on static urls, with no path variables
-        # route = route.lstrip('/')
+    def _get_and_wrap_routes(self):
+        for method, routes in self._routes.items():
+            for path, t in routes.items():
+                handler, params = t
+                wrapped = yield handler
+                routes[path] = (wrapped, handler, params)
 
-        # -----------
+    def _prepare_route(self, route):
         route = route.replace('/', '.').lstrip('.')
         route = route.lstrip(self.route_prefix)
         key, params = _parameterize_path(route)
@@ -78,14 +89,14 @@ class Router:
         route = route.lstrip(self.route_prefix)
         path, params = _parameterize_path(route)
         try:
-            handler, keys = self._routes[method][path]
+            wrapped, handler, keys = self._routes[method][path]
         except KeyError:
             raise webtypes.ResponseError(status=404)
         assert len(keys) == len(params)
         for key, param in zip(keys, params):
             request.path_params[key] = param
         request._handler = handler
-        return handler
+        return wrapped
 
     def set_prefix(self, prefix):
         prefix = prefix.lstipl('/').replace('/', '.')
@@ -98,6 +109,8 @@ class Router:
         parameters.
         Ideally, this is used for non-public facing endpoints such as
         "/healthcheck", or "/stats" or something of that nature.
+
+        Currently, all static routes bypass middlewares
         """
         if not isinstance(method, Methods):
             method = Methods(method.upper())

@@ -13,7 +13,7 @@ class Application:
                  transport: Union[TransportABC, Iterable[TransportABC]]=None,
                  *,
                  middlewares: List[callable]=None,
-                 default_headers=None,
+                 default_headers: dict=None,
                  debug: bool=False,
                  router: Router=None):
         if transport is None:
@@ -35,24 +35,26 @@ class Application:
 
     def run(self):
         loop = asyncio.get_event_loop()
-        # todo: Call on-startup hook
+        # wrap handlers in middleware
+        loop.run_until_complete(self._wrap_handlers())
         for t in self.transport:
             t.listen(loop=loop)
 
+        # Call on-startup hooks
         for coro in self.on_start:
             loop.run_until_complete(coro(self))
 
-        # todo: fork/add processes
+        # todo: fork/add processes?
         for t in self.transport:
             t.start(self, loop=loop)
         try:
             loop.run_forever()
         except KeyboardInterrupt:
             print('Shutting down')
-
-            # todo: Call on-shutdown hook
         for t in self.transport:
             t.shutdown(loop=loop)
+
+        # todo: Call on-shutdown hooks
 
         loop.close()
 
@@ -85,3 +87,17 @@ class Application:
         response.headers = {**self.default_headers, **response.headers}
 
         return response
+
+    async def _wrap_handlers(self):
+        handler_gen = self.router._get_and_wrap_routes()
+
+        try:
+            handler = next(handler_gen)
+            while True:
+                wrapped = handler
+                for middleware in self.middlewares[::-1]:
+                    wrapped = await middleware(self, wrapped)
+                handler = handler_gen.send(wrapped)
+        except StopIteration:
+            pass
+
