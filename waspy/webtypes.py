@@ -13,6 +13,15 @@ class QueryParams:
     """
     __slots__ = ['mappings']
 
+    @classmethod
+    def from_string(cls, string):
+        query_params = QueryParams()
+        qs = parse.parse_qsl(string)
+        for k, v in qs:
+            query_params.add(k, v)
+
+        return query_params
+
     def __init__(self):
         self.mappings = defaultdict(list)
 
@@ -35,12 +44,15 @@ class QueryParams:
     def add(self, name, value):
         self.mappings[name].append(value)
 
+    def __str__(self):
+        return parse.urlencode(self.mappings, doseq=True)
+
 
 class Request:
     def __init__(self, headers: dict = None,
                  path: str = None, correlation_id: str = None,
                  method: str = None, query_string: str = None,
-                 body: bytes=None, host: str = None):
+                 body: bytes=None, content_type='application/json'):
 
         if not headers:
             headers = dict()
@@ -52,9 +64,11 @@ class Request:
         self.query_string = query_string
         self._query_params = None
         self.body = body
-        self.host = host
         self.path_params = {}
         self._handler = None
+        self.app = None
+        self.content_type = content_type
+        self._json = None
 
     def cookies(self) -> dict:
         # a dictionary of cookies
@@ -64,15 +78,14 @@ class Request:
     def query(self) -> QueryParams:
         # parse query string into a dictionary
         if not self._query_params:
-            self._query_params = QueryParams()
-            qs = parse.parse_qsl(self.query_string)
-            for k, v in qs:
-                self._query_params.add(k, v)
+            self._query_params = QueryParams.from_string(self.query_string)
         return self._query_params
 
     def json(self) -> dict:
-        # convert body into a json dict
-        return json.loads(self.body.decode())
+        if not self._json:
+            # convert body into a json dict
+            self._json = json.loads(self.body.decode())
+        return self._json
 
     def get_path_var(self, key, default=None):
         return self.path_params.get(key, default=default)
@@ -94,6 +107,7 @@ class Response:
         self.body = body
         self.status = status
         self._data = None
+        self._json = None
 
     def __str__(self):
         return('<Response({status})@{id}>'
@@ -110,6 +124,15 @@ class Response:
         # reason portion of status code
         # for example, the reason in HTTP 200 OK is "OK"
         return 'OK'
+
+    def json(self) -> dict:
+        """
+        Used for client response
+        """
+        if not self._json:
+            # convert body into a json dict
+            self._json = json.loads(self.body.decode())
+        return self._json
 
 
 class ResponseError(Exception):

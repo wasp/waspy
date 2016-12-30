@@ -1,6 +1,6 @@
 
-from wasp import Application
-from wasp.transports import HTTPTransport
+from waspy import Application
+from waspy.transports import HTTPTransport
 
 app = Application(HTTPTransport(port=8080), debug=False)
 

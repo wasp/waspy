@@ -4,8 +4,19 @@ import aioamqp
 from aioamqp.channel import Channel
 import asyncio
 
-from .transportabc import TransportABC
+from .transportabc import TransportABC, ClientTransportABC
 from ..webtypes import Request, Response
+
+
+class RabbitMQClientTransport(ClientTransportABC):
+    def __init__(self):
+        raise NotImplementedError
+
+    def make_request(self, service: str, method: str, path: str,
+                     body: bytes = None, query: str = None,
+                     headers: dict = None, correlation_id: str = None,
+                     content_type: str = None, **kwargs):
+        raise NotImplementedError
 
 
 class RabbitMQTransport(TransportABC):
@@ -27,6 +38,9 @@ class RabbitMQTransport(TransportABC):
         self._loop = None
         self._consumer_tag = None
         self._counter = 0
+
+    def get_client(self):
+        pass
 
     async def declare_exchange(self):
         pass
@@ -111,7 +125,6 @@ class RabbitMQTransport(TransportABC):
             method=method,
             query_string=query,
             body=body,
-            host=None
         )
 
         response = await self._app.handle_request(request)

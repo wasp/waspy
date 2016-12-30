@@ -2,36 +2,45 @@ import traceback
 from typing import List, Union, Iterable
 import asyncio
 
+from .client import Client
 from .webtypes import Request, Response, ResponseError
 from .transports.transportabc import TransportABC
-from .transports.httptransport import HTTPTransport
 from .router import Router
 
 
 class Application:
     def __init__(self,
-                 transport: Union[TransportABC, Iterable[TransportABC]]=None,
+                 transport: Union[TransportABC,
+                                  Iterable[TransportABC]]=None,
                  *,
                  middlewares: List[callable]=None,
                  default_headers: dict=None,
                  debug: bool=False,
                  router: Router=None):
         if transport is None:
-            transport = HTTPTransport()
+            from .transports.httptransport import HTTPServerTransport
+            transport = HTTPServerTransport()
         if not isinstance(transport, tuple):
-            transport = transport,
+            transport = (transport,)
         if middlewares is None:
             middlewares = []
         if router is None:
             router = Router()
         if default_headers is None:
-            default_headers = {'Server': 'wasp'}
+            default_headers = {'Server': 'waspy'}
         self.transport = transport
         self.middlewares = middlewares
         self.default_headers = default_headers
         self.debug = debug
         self.router = router
         self.on_start = []
+        self._client = None
+
+    @property
+    def client(self) -> Client:
+        if not self._client:
+            self._client = Client(transport=self.transport[0].get_client())
+        return self._client
 
     def run(self):
         loop = asyncio.get_event_loop()

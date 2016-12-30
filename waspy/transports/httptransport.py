@@ -1,21 +1,114 @@
 import asyncio
 import socket
-import weakref
 
 import h11
 
 from ..webtypes import Request, Response
-from .transportabc import TransportABC
+from .transportabc import TransportABC, ClientTransportABC
 
 
 class ClosedError(Exception):
     """ Error for closed connections """
 
 
+class _HTTPClientConnection:
+    slots = ('reader', 'writer', 'conn', 'port', 'service')
+
+    def __init__(self, service, port):
+        self.reader = None
+        self.writer = None
+        self.port = port
+        self.service = service
+        self.conn = h11.Connection(our_role=h11.CLIENT)
+
+    async def connect(self):
+        self.reader, self.writer = await \
+            asyncio.open_connection(self.service, self.port)
+
+    def send(self, event):
+        data = self.conn.send(event)
+        if data is not None:
+            self.writer.write(data)
+
+    async def next_event(self):
+        while True:
+            event = self.conn.next_event()
+            if event is h11.NEED_DATA:
+                data = await self.reader.read(1064)
+                self.conn.receive_data(data)
+
+            else:
+                return event
+
+    def close(self):
+        self.send(h11.ConnectionClosed())
+        self.writer.close()
+
+
+class HTTPClientTransport(ClientTransportABC):
+    """Client implementation of the HTTP transport protocol"""
+    def _get_connection_for_service(self, service):
+        pass
+
+    async def make_request(self, service, method, path, body=None, query=None,
+                           headers=None, correlation_id=None,
+                           content_type=None, port=80, **kwargs):
+        # form request object
+        path = path.replace('.', '/')
+        if headers is None:
+            headers = {}
+        headers['Host'] = service
+        headers['Connection'] = 'close'
+        if correlation_id:
+            headers['X-Correlation-Id'] = correlation_id
+        if query:
+            path += '?' + query
+        if content_type:
+            headers['Content-Type'] = content_type
+        if body:
+            headers['Content-Length'] = str(len(body))
+
+        # now make a connection and send it
+        connection = _HTTPClientConnection(service, port)
+        await connection.connect()
+        connection.send(h11.Request(method=method, target=path,
+                                    headers=headers.items()))
+        if body:
+            connection.send(h11.Data(data=body))
+
+        connection.send(h11.EndOfMessage())
+
+        response = await connection.next_event()
+        assert type(response) is h11.Response
+
+        # form response object
+        status_code = response.status_code
+        headers = response.headers
+
+        result = Response(headers=headers, correlation_id=correlation_id,
+                          status=status_code)
+
+        body = b''
+        event = None
+        while type(event) is not h11.EndOfMessage:
+            event = await connection.next_event()
+            if type(event) is h11.Data:
+                body += body
+
+        result.body = body
+        connection.close()
+        return result
+
+
 class HTTPTransport(TransportABC):
+    """ Server implementation of the HTTP transport protocol"""
+
+    def get_client(self):
+        return HTTPClientTransport()
+
     def __init__(self, port=8080):
         self.port = port
-        self._app = None
+        self._handler = None
         self._server = None
 
     def listen(self, *, loop: asyncio.AbstractEventLoop):
@@ -23,17 +116,17 @@ class HTTPTransport(TransportABC):
             self.handle_incoming_request, '0.0.0.0', self.port, loop=loop)
         self._server = loop.run_until_complete(coro)
 
-    def start(self, app, *, loop: asyncio.AbstractEventLoop):
-        self._app = weakref.ref(app)()
+    def start(self, request_handler, *, loop: asyncio.AbstractEventLoop):
+        self._handler = request_handler
 
     async def handle_incoming_request(self, reader, writer):
         self._set_tcp_nodelay(writer)
-        protocol = HttpProtocol(reader=reader, writer=writer)
+        protocol = _HTTPServerProtocol(reader=reader, writer=writer)
 
         try:
             while True:
                 request = await protocol.get_request()
-                response = await self._app.handle_request(request)
+                response = await self._handler(request)
                 await protocol.send_response(response)
                 if protocol.conn.our_state is h11.MUST_CLOSE:
                     break
@@ -55,7 +148,12 @@ class HTTPTransport(TransportABC):
         socket_.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
 
 
-class HttpProtocol(asyncio.Protocol):
+class _HTTPServerProtocol(asyncio.Protocol):
+    """ HTTP Protocol handler.
+        Should only be used by HTTPServerTransport
+    """
+    __slots__ = ('conn', 'reader', 'writer')
+
     def __init__(self, reader=None, writer=None):
         self.conn = h11.Connection(h11.SERVER)
         self.reader = reader
@@ -99,7 +197,6 @@ class HttpProtocol(asyncio.Protocol):
             query = target[1]
         except IndexError:
             query = None
-        host = headers.pop('host', None)
         method = event.method.decode('ascii')
 
         body = b''
@@ -116,7 +213,6 @@ class HttpProtocol(asyncio.Protocol):
             query_string=query,
             path=path,
             body=body,
-            host=host,
             correlation_id=None
         )
 

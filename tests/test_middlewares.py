@@ -1,6 +1,6 @@
 import asyncio
 
-from wasp import Application, Request
+from waspy import Application, Request
 
 
 def test_that_middleware_wrapping_works():
@@ -9,7 +9,6 @@ def test_that_middleware_wrapping_works():
             request.a = 'a'
             return await handler(request)
         return middleware_a
-
 
     async def middleware_b_factory(app, handler):
         async def middleware_b(request):

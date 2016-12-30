@@ -1,6 +1,6 @@
 import pytest
 
-from wasp import router
+from waspy import router
 
 
 

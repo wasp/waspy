@@ -1,6 +1,6 @@
 from enum import Enum
 
-from wasp import webtypes
+from waspy import webtypes
 
 
 class NonRESTfulURLError(NotImplementedError):

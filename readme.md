@@ -27,10 +27,10 @@ There are a lot of features missing.
 Features for beta:
 - [x]: HTTP Transport
 - [x]: Routing
-- [x]: RabbitMQ transport
+- [x]: RabbitMQ transporty
 - [x]: Support middlewares
-- [ ]: Client library (for calling other services)
-- [ ]: HTTP client transport (with envvar service discovery)
+- [x]: Client library (for calling other services)
+- [x]: HTTP client transport (with envvar service discovery)
 - [ ]: RabbitMQ client transport
  
 Wish List:

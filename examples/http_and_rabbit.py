@@ -1,6 +1,6 @@
 
-from wasp import Application, Response, Request
-from wasp.transports import RabbitMQTransport, HTTPTransport
+from waspy import Application, Response, Request
+from waspy.transports import RabbitMQTransport, HTTPTransport
 
 rabbit = RabbitMQTransport(
     url='127.0.0.1',  # requires rabbitmq running locally (docker?)
