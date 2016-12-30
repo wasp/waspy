@@ -52,7 +52,6 @@ class Router:
         Static routes look similar to routes, but with only a handler, no tuple
         {method: {path: handler}}
         """
-        self.route_prefix = ''
         self.handle_404 = _send_404
         self.wrapped_404 = None  # gets set in _get_and_wrap_routes
 
@@ -67,7 +66,6 @@ class Router:
 
     def _prepare_route(self, route):
         route = route.replace('/', '.').lstrip('.')
-        route = route.lstrip(self.route_prefix)
         key, params = _parameterize_path(route)
 
         # Check that route is RESTful
@@ -94,7 +92,6 @@ class Router:
             # not in static routes
             pass
 
-        route = route.lstrip(self.route_prefix)
         path, params = _parameterize_path(route)
         try:
             wrapped, handler, keys = self._routes[method][path]
@@ -107,10 +104,6 @@ class Router:
             request.path_params[key] = param
         request._handler = handler
         return wrapped
-
-    def set_prefix(self, prefix):
-        prefix = prefix.lstipl('/').replace('/', '.')
-        self.route_prefix = prefix
 
     def add_static_route(self, method: str, route: str, handler: callable):
         """
