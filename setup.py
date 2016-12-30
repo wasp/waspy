@@ -8,7 +8,7 @@ setup(
         'aioamqp==0.8.2'
     ],
     packages=['waspy'],
-    url='https://github.com/wickedasp/waspy',
+    url='https://github.com/wasp/waspy',
     license='Apache 2.0',
     author='nhumrich',
     author_email='',
