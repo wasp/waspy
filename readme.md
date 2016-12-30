@@ -1,6 +1,6 @@
 # WASPy
 
-Waspy is the python framework for the (WASP project)[https://github.com/wasp/wasp]. 
+Waspy is the python framework for the [WASP project](https://github.com/wasp/wasp). 
     In other words its an asynchronous "transport-agnostic" web framework.
 
 ## Language agnostic concepts
