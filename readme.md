@@ -1,13 +1,7 @@
-# wasp
+# WASPy
 
-Wasp is a asynchronous "transport-agnostic" web framework.
-It allows you to spin up a RESTful web service that can listen on any transport
-such as HTTP, RabbitMQ, or others.
-
-`wasp` stands for a Wicked Async Services Platform.
-It is a project designed to make microservices in python easier. 
-This repo is the main python web-framework for using wasp.
-The org `wickedasp` (wasp was already taken) is for the project as a whole.
+Waspy is the python framework for the (WASP project)[https://github.com/wasp/wasp]. 
+    In other words its an asynchronous "transport-agnostic" web framework.
 
 ## Language agnostic concepts
 While this framework is for python, the patterns used in wasp are language
