@@ -75,6 +75,8 @@ class RabbitMQTransport(TransportABC):
             await self.channel.basic_qos(prefetch_count=1, prefetch_size=0)
 
         loop.run_until_complete(setup())
+        print('-- Listening for rabbitmq messages on queue {} --'
+              .format(self.queue))
 
     async def connect(self, loop=None):
         self._transport, self._protocol = await aioamqp.connect(
@@ -132,10 +134,12 @@ class RabbitMQTransport(TransportABC):
             # nowhere to reply. No point it trying to send a response
             return
 
+        response.headers['Status'] = str(response.status.value)
+
         properties = {
             'correlation_id': response.correlation_id,
             'headers': response.headers,
-            'content_type': 'application/json'
+            'content_type': response.content_type
         }
         await channel.basic_publish(response.data, '', reply_to,
                                     properties=properties)

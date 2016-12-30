@@ -2,6 +2,7 @@ import json
 from collections import defaultdict
 from urllib import parse
 from .router import Methods
+from http import HTTPStatus
 
 
 class QueryParams:
@@ -99,13 +100,30 @@ class Request:
 
 class Response:
     def __init__(self, headers=None, correlation_id=None,
-                 body=None, status=200):
+                 body=None, status=HTTPStatus.OK,
+                 content_type='application/json', meta: dict=None):
+        """
+        Response object
+        :param headers:
+        :param correlation_id:
+        :param body: message body
+        :param status: status code
+        :param content_type:
+        :param meta: Extra context information.
+            Not to be returned through transport
+        """
         if not headers:
             headers = dict()
+        if isinstance(status, int):  # convert to enum
+            status = HTTPStatus(status)
+        if meta is None:
+            meta = {}
         self.headers = headers
         self.correlation_id = correlation_id
         self.body = body
         self.status = status
+        self.content_type = content_type
+        self.meta = meta
         self._data = None
         self._json = None
 
@@ -116,14 +134,11 @@ class Response:
     @property
     def data(self):
         if self._data is None and self.body:
-            self._data = json.dumps(self.body).encode()
+            if self.content_type == 'application/json':
+                self._data = json.dumps(self.body).encode()
+            else:
+                self._data = self.body
         return self._data
-
-    @property
-    def reason(self):
-        # reason portion of status code
-        # for example, the reason in HTTP 200 OK is "OK"
-        return 'OK'
 
     def json(self) -> dict:
         """
@@ -137,7 +152,9 @@ class Response:
 
 class ResponseError(Exception):
     def __init__(self, status, *, body=None, headers=None,
-                 correlation_id=None):
+                 correlation_id=None, reason=None):
         super().__init__()
+        if reason and not body:
+            body = {'reason': reason}
         self.response = Response(status=status, body=body, headers=headers,
                                  correlation_id=correlation_id)

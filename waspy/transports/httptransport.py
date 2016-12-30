@@ -115,6 +115,7 @@ class HTTPTransport(TransportABC):
         coro = asyncio.start_server(
             self.handle_incoming_request, '0.0.0.0', self.port, loop=loop)
         self._server = loop.run_until_complete(coro)
+        print('-- Listening for HTTP on port {} --'.format(self.port))
 
     def start(self, request_handler, *, loop: asyncio.AbstractEventLoop):
         self._handler = request_handler
@@ -171,8 +172,8 @@ class _HTTPServerProtocol(asyncio.Protocol):
 
     async def send_response(self, response: Response):
         headers = [(name, value) for name, value in response.headers.items()]
-        r = h11.Response(status_code=response.status, headers=headers,
-                         reason=response.reason)
+        r = h11.Response(status_code=response.status.value, headers=headers,
+                         reason=response.status.phrase)
         await self._send(r)
         await self._send(h11.Data(data=response.data))
         await self._send(h11.EndOfMessage())

@@ -35,6 +35,10 @@ def _parameterize_path(path):
     return key, params
 
 
+async def _send_404(request):
+    raise webtypes.ResponseError(status=404)
+
+
 class Router:
     def __init__(self):
         self._routes = {}
@@ -49,6 +53,8 @@ class Router:
         {method: {path: handler}}
         """
         self.route_prefix = ''
+        self.handle_404 = _send_404
+        self.wrapped_404 = None  # gets set in _get_and_wrap_routes
 
     def _get_and_wrap_routes(self):
         for method, routes in self._routes.items():
@@ -56,6 +62,8 @@ class Router:
                 handler, params = t
                 wrapped = yield handler
                 routes[path] = (wrapped, handler, params)
+        wrapped = yield self.handle_404
+        self.wrapped_404 = wrapped
 
     def _prepare_route(self, route):
         route = route.replace('/', '.').lstrip('.')
@@ -91,7 +99,9 @@ class Router:
         try:
             wrapped, handler, keys = self._routes[method][path]
         except KeyError:
-            raise webtypes.ResponseError(status=404)
+            wrapped = self.wrapped_404
+            request._handler = self.handle_404
+            return wrapped
         assert len(keys) == len(params)
         for key, param in zip(keys, params):
             request.path_params[key] = param

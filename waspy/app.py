@@ -84,7 +84,7 @@ class Application:
                     body = response[0]
                     status = response[1]
                     response = Response(status=status, body=body)
-                elif isinstance(response, dict):
+                elif isinstance(response, dict) or isinstance(response, str):
                     response = Response(body=response)
 
         except ResponseError as r:
@@ -92,6 +92,8 @@ class Application:
         except Exception as e:
             traceback.print_exc()
             response = Response(status=500)
+        if not response.correlation_id:
+            response.correlation_id = request.correlation_id
         # add default headers
         response.headers = {**self.default_headers, **response.headers}
 
