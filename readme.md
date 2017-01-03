@@ -37,7 +37,7 @@ Wish List:
 Apache-2.0
 
 ## Installing
-To install, you will need to `git clone` for now, and run `pip install .`
+To install, just run `pip install waspy`
 
 ## Developing
 `python setup.py develop`

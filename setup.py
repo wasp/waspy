@@ -4,17 +4,16 @@ try:
     import pypandoc
     long_description = pypandoc.convert('readme.md', 'rst')
 except(IOError, ImportError):
-    raise
     long_description = open('readme.md').read()
 
 setup(
     name='waspy',
-    version='0.2.0',
+    version='0.2.3',
     install_requires=[
         'h11==0.7.0',
         'aioamqp==0.8.2'
     ],
-    packages=['waspy'],
+    packages=['waspy', 'waspy.transports'],
     long_description=long_description,
     url='https://github.com/wasp/waspy',
     license='Apache 2.0',

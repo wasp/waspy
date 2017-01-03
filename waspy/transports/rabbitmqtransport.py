@@ -38,6 +38,7 @@ class RabbitMQTransport(TransportABC):
         self._loop = None
         self._consumer_tag = None
         self._counter = 0
+        self._handler = None
 
     def get_client(self):
         pass
@@ -53,9 +54,9 @@ class RabbitMQTransport(TransportABC):
                                       queue_name=self.queue,
                                       routing_key=routing_key)
 
-    def start(self, app, *, loop):
-        self._app = weakref.ref(app)()
-        self._loop = weakref.ref(loop)()
+    def start(self, handler, *, loop):
+        self._handler = handler
+        self._loop = loop
         async def consume():
             # Need to reconnect because of potential forking affects
             await self.close()
@@ -129,7 +130,7 @@ class RabbitMQTransport(TransportABC):
             body=body,
         )
 
-        response = await self._app.handle_request(request)
+        response = await self._handler(request)
         if not reply_to:
             # nowhere to reply. No point it trying to send a response
             return

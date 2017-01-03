@@ -55,7 +55,7 @@ class Application:
 
         # todo: fork/add processes?
         for t in self.transport:
-            t.start(self, loop=loop)
+            t.start(self.handle_request, loop=loop)
         try:
             loop.run_forever()
         except KeyboardInterrupt:
