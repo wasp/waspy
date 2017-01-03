@@ -32,6 +32,10 @@ Wish List:
 - [ ]: Transport classes for kafka
 - [ ]: pattern for synchronous "worker-tier"
 - [ ]: decorators for adding routes
+- [ ]: configuration package
+- [ ]: auto-reloading when in debug mode
+- [ ]: sentry integration
+- [ ]: jwt handling
 
 ## License
 Apache-2.0
