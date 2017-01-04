@@ -18,7 +18,7 @@ async def handle_bar(request):
     return {'foo': fooid, 'bar': barid}
 
 async def handle_options(request):
-    return {'hello': 'world'}
+    return None, 204
 
 app.router.add_static_route('get', '/hello', handle_hello)
 app.router.add_get('/foo/:fooid', handle_foo)

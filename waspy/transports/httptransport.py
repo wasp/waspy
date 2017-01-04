@@ -180,7 +180,9 @@ class _HTTPServerProtocol(asyncio.Protocol):
         r = h11.Response(status_code=response.status.value, headers=headers,
                          reason=response.status.phrase)
         await self._send(r)
-        await self._send(h11.Data(data=response.data))
+        data = response.data
+        if data is not None:
+            await self._send(h11.Data(data=data))
         await self._send(h11.EndOfMessage())
 
     async def _send(self, r):
