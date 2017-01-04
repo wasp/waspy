@@ -56,12 +56,15 @@ class Request:
                  body: bytes=None, content_type='application/json'):
 
         if not headers:
-            headers = dict()
-
+            headers = {}
+        if not method:
+            method = 'GET'
+        if isinstance(method, str):
+            method = Methods(method.upper())
         self.headers = headers
         self.path = path
         self.correlation_id = correlation_id
-        self.method = Methods(method.upper())
+        self.method = method
         self.query_string = query_string
         self._query_params = None
         self.body = body
@@ -70,10 +73,17 @@ class Request:
         self.app = None
         self.content_type = content_type
         self._json = None
+        self._cookies = None
 
+    @property
     def cookies(self) -> dict:
-        # a dictionary of cookies
-        return dict()
+        if self._cookies is None:
+            self._cookies = {}
+            for string in self.headers.get('cookie', '').split('; '):
+                key, value = string.split('=')
+                self._cookies[key] = value
+
+        return self._cookies
 
     @property
     def query(self) -> QueryParams:

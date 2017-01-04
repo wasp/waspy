@@ -106,8 +106,11 @@ class HTTPTransport(TransportABC):
     def get_client(self):
         return HTTPClientTransport()
 
-    def __init__(self, port=8080):
+    def __init__(self, port=8080, prefix=None):
         self.port = port
+        if prefix is None:
+            prefix = ''
+        self.prefix = prefix
         self._handler = None
         self._server = None
 
@@ -122,7 +125,8 @@ class HTTPTransport(TransportABC):
 
     async def handle_incoming_request(self, reader, writer):
         self._set_tcp_nodelay(writer)
-        protocol = _HTTPServerProtocol(reader=reader, writer=writer)
+        protocol = _HTTPServerProtocol(reader=reader, writer=writer,
+                                       prefix=self.prefix)
 
         try:
             while True:
@@ -155,10 +159,11 @@ class _HTTPServerProtocol(asyncio.Protocol):
     """
     __slots__ = ('conn', 'reader', 'writer')
 
-    def __init__(self, reader=None, writer=None):
+    def __init__(self, reader=None, writer=None, prefix=None):
         self.conn = h11.Connection(h11.SERVER)
         self.reader = reader
         self.writer = writer
+        self.prefix = prefix
 
     async def _read(self):
         if self.conn.they_are_waiting_for_100_continue:
@@ -193,7 +198,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
 
         # split path and query string
         target = event.target.decode('ascii').split('?', maxsplit=1)
-        path = target[0]
+        path = target[0].lstrip(self.prefix)
         try:
             query = target[1]
         except IndexError:

@@ -50,10 +50,14 @@ class Router:
         self._static_routes = {}
         """
         Static routes look similar to routes, but with only a handler, no tuple
+        (before the app is started, they also include a boolean to whether
+        they should be wrapped or not {method: {path: handler, True}})
         {method: {path: handler}}
         """
-        self.handle_404 = _send_404
-        self.wrapped_404 = None  # gets set in _get_and_wrap_routes
+        self._no_wrap_static_routes = {}
+        self.options_handler = None
+
+        self.handle_404 = _send_404  # the 404 route will skip middlewares
 
     def _get_and_wrap_routes(self):
         for method, routes in self._routes.items():
@@ -61,8 +65,14 @@ class Router:
                 handler, params = t
                 wrapped = yield handler
                 routes[path] = (wrapped, handler, params)
-        wrapped = yield self.handle_404
-        self.wrapped_404 = wrapped
+        for method, routes in self._static_routes.items():
+            for path, t in routes.items():
+                handler, should_not_wrap = t
+                if should_not_wrap:
+                    wrapped = handler
+                else:
+                    wrapped = yield handler
+                routes[path] = wrapped
 
     def _prepare_route(self, route):
         route = route.replace('/', '.').lstrip('.')
@@ -86,6 +96,10 @@ class Router:
         method = request.method
         path = request.path
         route = path.lstrip('/').replace('/', '.')
+        if method == Methods.OPTIONS and self.options_handler is not None:
+            request._handler = self.options_handler
+            return self.options_handler
+
         try:
             return self._static_routes[method][route]
         except KeyError:
@@ -96,16 +110,16 @@ class Router:
         try:
             wrapped, handler, keys = self._routes[method][path]
         except KeyError:
-            wrapped = self.wrapped_404
             request._handler = self.handle_404
-            return wrapped
+            return self.handle_404
         assert len(keys) == len(params)
         for key, param in zip(keys, params):
             request.path_params[key] = param
         request._handler = handler
         return wrapped
 
-    def add_static_route(self, method: str, route: str, handler: callable):
+    def add_static_route(self, method: str, route: str, handler: callable,
+                         skip_middleware=False):
         """
         Adds a static route. A static route is a special route that
         doesnt follow any of the normal rules, and never has any path
@@ -113,14 +127,14 @@ class Router:
         Ideally, this is used for non-public facing endpoints such as
         "/healthcheck", or "/stats" or something of that nature.
 
-        Currently, all static routes bypass middlewares
+        Set `skip_middleware` to true to bypass middlewares
         """
         if not isinstance(method, Methods):
             method = Methods(method.upper())
         if method not in self._static_routes:
             self._static_routes[method] = {}
         route = route.lstrip('/').replace('/', '.')
-        self._static_routes[method][route] = handler
+        self._static_routes[method][route] = handler, skip_middleware
 
     def add_route(self, method: str, route: str, handler: callable):
         if not isinstance(method, Methods):
@@ -150,3 +164,9 @@ class Router:
 
     def add_options(self, route: str, handler: callable):
         self.add_route(Methods.OPTIONS, route, handler)
+
+    def add_generic_options_handler(self, handler: callable):
+        """
+        Add a handler for all options requests. This WILL bypass middlewares
+        """
+        self.options_handler = handler
