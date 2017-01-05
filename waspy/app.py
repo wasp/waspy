@@ -95,7 +95,9 @@ class Application:
         if not response.correlation_id:
             response.correlation_id = request.correlation_id
         # add default headers
-        response.headers = {**self.default_headers, **response.headers}
+        additional_headers = self.default_headers.copy()
+        additional_headers['content-length'] = str(len(response.data))
+        response.headers = {**additional_headers, **response.headers}
 
         return response
 

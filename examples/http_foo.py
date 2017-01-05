@@ -6,7 +6,7 @@ app = Application(HTTPTransport(port=8080, prefix='/api'), debug=False)
 
 
 async def handle_hello(request):
-    return {'hello': 'world'}, 502
+    return {'hello': 'world'}
 
 async def handle_foo(request):
     fooid = request.path_params.get('fooid')
