@@ -32,11 +32,11 @@ def router():
     ('/single', 1, []),
     ('/double/double', 2, []),
     ('/something/static/and/long', 3, []),
-    ('/single/myid2', 4, ['id']),
-    ('/foo/someid2/bar/:barid', 5, ['fooid', 'barid']),
-    ('/foo/fooid1234/bar', 6, ['fooid']),
-    ('/foo/bar/baz/id1234', 7, ['id']),
-    ('/multiple/id1234/in999/a_id_1234/row', 8, ['ids', 'in', 'a']),
+    ('/single/:id', 4, ['id']),
+    ('/foo/:fooid/bar/:barid', 5, ['fooid', 'barid']),
+    ('/foo/:fooid/bar', 6, ['fooid']),
+    ('/foo/bar/baz/:id', 7, ['id']),
+    ('/multiple/:ids/:in/:a/row', 8, ['ids', 'in', 'a']),
 ])
 def test_get_handler(path, expected_handler, expected_params, router):
     # Set up dummy request
@@ -49,4 +49,5 @@ def test_get_handler(path, expected_handler, expected_params, router):
     assert handler == expected_handler
     for key in expected_params:
         assert key in request.path_params
+        assert request.path_params[key] == ':' + key
 
