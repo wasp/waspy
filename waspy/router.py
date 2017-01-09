@@ -16,25 +16,6 @@ class Methods(Enum):
     PATCH = 'PATCH'
     HEAD = 'HEAD'
 
-
-def _parameterize_path(path):
-    path_parts = path.split('.')
-
-    params = []
-    on_id_segment = False
-    key = ''
-    for part in path_parts:
-        if on_id_segment:
-            # this part is a resource id
-            key += '.*'
-            params.append(part)
-        else:
-            # this part is a resource name
-            key += '.' + part
-        on_id_segment = not on_id_segment
-    return key, params
-
-
 async def _send_404(request):
     raise webtypes.ResponseError(status=404)
 
@@ -70,24 +51,6 @@ class Router:
                 handler, params = value
                 wrapped = yield handler
                 _d[key] = (wrapped, handler, params)
-
-    def _prepare_route(self, route):
-        route = route.replace('/', '.').lstrip('.')
-        key, params = _parameterize_path(route)
-
-        # Check that route is RESTful
-        for p in params:
-            if (not p.startswith(':') or
-                    (not p.startswith('{') and p.endswith('}'))):
-                # Param is not an id parameter
-                raise NonRESTfulURLError('Path variable expected in url, '
-                                         'instead got {}')
-        if ':' in key or '{' in key:
-            raise NonRESTfulURLError('Got a path variable in URL when a '
-                                     'resource name was expected')
-
-        params = [p.strip(':').strip('{}') for p in params]
-        return key, params
 
     def get_handler_for_request(self, request):
         method = request.method

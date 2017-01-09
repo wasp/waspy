@@ -4,8 +4,8 @@ import asyncio
 
 from .client import Client
 from .webtypes import Request, Response, ResponseError
-from .transports.transportabc import TransportABC
 from .router import Router
+from waspy.transports.transportabc import TransportABC
 
 
 class Application:
@@ -18,8 +18,8 @@ class Application:
                  debug: bool=False,
                  router: Router=None):
         if transport is None:
-            from .transports.httptransport import HTTPServerTransport
-            transport = HTTPServerTransport()
+            from waspy.transports.httptransport import HTTPTransport
+            transport = HTTPTransport()
         if not isinstance(transport, tuple):
             transport = (transport,)
         if middlewares is None:
