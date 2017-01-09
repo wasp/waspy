@@ -44,35 +44,32 @@ class Router:
         self._routes = {}
         """
         Routes looks like:
-        {method: {path: (handler, params)}} before startup and
-        {method: {path: (wrapped, handler, params)}} after startup
+        {path_section1: {path_section2: {method: (handler, params)}}}
+                before startup and
+        {path_section1: {papath_section2 {method: (wrapped, handler, params)}}
+                after startup
         """
         self._static_routes = {}
         """
-        Static routes look similar to routes, but with only a handler, no tuple
-        (before the app is started, they also include a boolean to whether
-        they should be wrapped or not {method: {path: handler, True}})
-        {method: {path: handler}}
+        Static routes are just simple d[url][method] lookups and skip
+        middlewares
         """
-        self._no_wrap_static_routes = {}
         self.options_handler = None
 
         self.handle_404 = _send_404  # the 404 route will skip middlewares
 
-    def _get_and_wrap_routes(self):
-        for method, routes in self._routes.items():
-            for path, t in routes.items():
-                handler, params = t
+    def _get_and_wrap_routes(self, _d=None):
+        if _d is None:
+            _d = self._routes
+        for key, value in _d.items():
+            # if value is a dictionary, keep going
+            # if value is a tuple, then wrap it!
+            if isinstance(value, dict):
+                yield from self._get_and_wrap_routes(_d=value)
+            else:
+                handler, params = value
                 wrapped = yield handler
-                routes[path] = (wrapped, handler, params)
-        for method, routes in self._static_routes.items():
-            for path, t in routes.items():
-                handler, should_not_wrap = t
-                if should_not_wrap:
-                    wrapped = handler
-                else:
-                    wrapped = yield handler
-                routes[path] = wrapped
+                _d[key] = (wrapped, handler, params)
 
     def _prepare_route(self, route):
         route = route.replace('/', '.').lstrip('.')
@@ -97,19 +94,28 @@ class Router:
         path = request.path
         route = path.lstrip('/').replace('/', '.')
         if method == Methods.OPTIONS and self.options_handler is not None:
+            # Is this an OPTSION and do we have a generic options handler?
             request._handler = self.options_handler
             return self.options_handler
 
         try:
-            return self._static_routes[method][route]
+            return self._static_routes[route][method]
         except KeyError:
             # not in static routes
             pass
 
-        path, params = _parameterize_path(route)
+        d = self._routes
+        params = []
         try:
-            wrapped, handler, keys = self._routes[method][path]
+            for portion in route.split('.'):
+                sub = d.get(portion, None)
+                if sub is None:
+                    sub = d['_id']
+                    params.append(portion)
+                d = sub
+            wrapped, handler, keys = d[method]
         except KeyError:
+            # No handler for given route
             request._handler = self.handle_404
             return self.handle_404
         assert len(keys) == len(params)
@@ -127,22 +133,34 @@ class Router:
         Ideally, this is used for non-public facing endpoints such as
         "/healthcheck", or "/stats" or something of that nature.
 
-        Set `skip_middleware` to true to bypass middlewares
+        All static routes SKIP middlewares
         """
         if not isinstance(method, Methods):
             method = Methods(method.upper())
-        if method not in self._static_routes:
-            self._static_routes[method] = {}
         route = route.lstrip('/').replace('/', '.')
-        self._static_routes[method][route] = handler, skip_middleware
+        if route not in self._static_routes:
+            self._static_routes[route] = {}
+        self._static_routes[route][method] = handler
 
     def add_route(self, method: str, route: str, handler: callable):
         if not isinstance(method, Methods):
             method = Methods(method.upper())
-        if method not in self._routes:
-            self._routes[method] = {}
-        prepared_route, params = self._prepare_route(route)
-        self._routes[method][prepared_route] = handler, params
+
+        route = route.replace('/', '.').lstrip('.')
+        d = self._routes
+        params = []
+        for portion in route.split('.'):
+            if (portion.startswith(':') or
+                    (portion.startswith('{') and portion.endswith('}'))):
+                params.append(portion.strip(':').strip('{}'))
+                key = '_id'
+            else:
+                key = portion
+            if key not in d:
+                d[key] = {}
+            d = d[key]
+
+        d[method] = handler, params
 
     def add_get(self, route: str, handler: callable):
         self.add_route(Methods.GET, route, handler)
