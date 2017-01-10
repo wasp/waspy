@@ -1,8 +1,11 @@
-
+#!/bin/env python3
 from waspy import Application
 from waspy.transports import HTTPTransport
+from waspy import config
 
-app = Application(HTTPTransport(port=8080, prefix='/api'), debug=False)
+PORT = config['http']['port']
+
+app = Application(HTTPTransport(port=PORT, prefix='/api'), debug=False)
 
 
 async def handle_hello(request):
