@@ -1,8 +1,8 @@
 import os
 import sys
-import toml
+import yaml
 
-FILE_NAME = 'config.toml'
+FILE_NAME = 'config.yaml'
 BASEPATH = os.path.dirname(sys.modules['__main__'].__file__)
 
 
@@ -36,6 +36,16 @@ class ConfigBase:
                         envvar_string
                     ))
             return default
+        # env vars are always passed in as strings in docker world
+        # here we will try to convert them to basic types if we can
+        if env.lower() == 'true':
+            env = True
+        if env.lower() == 'false':
+            env = False
+        try:
+            env = int(env)
+        except ValueError:
+            pass
         return env
 
 
@@ -59,7 +69,7 @@ class Config(ConfigBase):
     def load_config(self):
         filepath = os.path.abspath(os.path.join(BASEPATH, FILE_NAME))
         with open(filepath, 'r') as f:
-            config = toml.load(f)
+            config = yaml.load(f)
             return config
 
     def __getitem__(self, item):

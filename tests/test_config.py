@@ -1,24 +1,27 @@
 import pytest
-import toml
+import io
+import yaml
 
 from waspy.configuration import Config, ConfigError
 @pytest.fixture
 def config(monkeypatch):
-    toml_string = """
-flat = true  # boolean
+    yaml_string = """
 
-[wasp]
-setting1 = 1  # int
-foo = 'bar'  # string
+wasp:
+  setting1: 1  # int
+  foo: bar  # string
 
-[database]
-username = 'normal_user'
+database:
+  username: normal_user
 
-  [database.migration]
-  username = 'migration_user'
+  migration:
+    username: migration_user
+
+flat: true  # boolean
 """
     def my_load_config(self):
-        return toml.loads(toml_string)
+
+        return yaml.load(io.StringIO(yaml_string))
 
     monkeypatch.setattr(Config, 'load_config', my_load_config)
     return Config()
@@ -56,5 +59,15 @@ def test_get_env_var_with_no_default(config, monkeypatch):
 def test_get_env_var_override(config, monkeypatch):
     monkeypatch.setenv('DATABASE_USERNAME', 'other_user')
     assert config['database']['username'] == 'other_user'
+
+
+def test_get_int_from_env_var(config, monkeypatch):
+    monkeypatch.setenv('WASP_SETTING1', '1')
+    assert config['wasp']['setting1'] == 1
+
+
+def test_get_bool_from_env_var(config, monkeypatch):
+    monkeypatch.setenv('flat', 'true')
+    assert config['flat'] == True
 
 
