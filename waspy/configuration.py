@@ -1,9 +1,8 @@
 import os
-import sys
 import yaml
 
 FILE_NAME = 'config.yaml'
-BASEPATH = os.path.dirname(sys.modules['__main__'].__file__)
+BASEPATH = os.getcwd()
 
 
 class ConfigError(KeyError):
