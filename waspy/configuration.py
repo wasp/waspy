@@ -50,12 +50,12 @@ class ConfigBase:
 
 class Config(ConfigBase):
     """ load configuration from envvar or config file
-        You can get settings from environment variables or a config.toml file
+        You can get settings from environment variables or a config.yaml file
         Environment variables have a higher precedence over the config file
 
         Use `config['section']['subsection']['key']` to get the value
         SECTION_SUBSECTION_KEY from environment variables or
-        section.subsection.key from a toml file
+        section.subsection.key from a yaml file
         (usually written:
             [section.subsection]
             key = value
