@@ -1,6 +1,6 @@
 import asyncio
 
-from waspy import Application, Request
+from waspy import Application, Request, Response
 
 
 def test_that_middleware_wrapping_works():
@@ -31,4 +31,5 @@ def test_that_middleware_wrapping_works():
     handler = app.router.get_handler_for_request(request)
     assert handler != handle
     result = loop.run_until_complete(handler(request))
-    assert result == 'c'
+    assert isinstance(result, Response)
+    assert result.body == 'c'

@@ -2,7 +2,7 @@ import json
 from urllib import parse
 import uuid
 
-from .webtypes import QueryParams
+from .webtypes import QueryParams, Request, Methods
 
 
 class Client:
@@ -16,10 +16,34 @@ class Client:
         self.transport = transport
 
     async def make_request(self, method, service, path, body=None,
-                           query_params=None, headers=None,
-                           correlation_id=None,
-                           content_type='application/json', **kwargs):
-        """ Make a request"""
+                           query_params: QueryParams=None,
+                           headers: dict=None,
+                           correlation_id: str=None,
+                           content_type: str='application/json',
+                           context: Request=None,
+                           **kwargs):
+        """
+        Make a request to another service. If `context` is provided, then
+        context and correlation will be pulled from the provided request
+        object for you. This includes credentials, correlationid,
+        and service-headers.
+
+        :param method: GET/PUT/PATCH, etc.
+        :param service: name of service
+        :param path: request object path
+        :param body: body of request
+        :param query_params:
+        :param headers:
+        :param correlation_id:
+        :param content_type:
+        :param context: A request object from which a "child-request"
+            will be made
+        :param kwargs: Just a place holder so transport specific options
+            can be passed through
+        :return:
+        """
+        if not isinstance(method, Methods):
+            method = Methods(method)
         if content_type == 'application/json' and isinstance(body, dict):
             body = json.dumps(body)
         if isinstance(query_params, dict):
@@ -28,6 +52,11 @@ class Client:
             query_string = str(QueryParams)
         else:
             query_string = ''
+
+        if context:
+            if not correlation_id:
+                correlation_id = context.correlation_id
+
         if not correlation_id:
             correlation_id = uuid.uuid4()
         if isinstance(body, str):
@@ -35,20 +64,28 @@ class Client:
         response = await self.transport.make_request(
             service, method, path, body=body, query=query_string,
             headers=headers, correlation_id=correlation_id,
-            content_type=content_type)
+            content_type=content_type, **kwargs)
         return response
 
-    async def get(self, service, path):
-        """ Make a get request """
+    def get(self, service, path, **kwargs):
+        """ Make a get request (this returns a coroutine)"""
+        return self.make_request(Methods.GET, service, path, **kwargs)
 
-    async def post(self, service, path, body):
-        """ Make a post request """
+    def post(self, service, path, body, **kwargs):
+        """ Make a post request (this returns a coroutine)"""
+        return self.make_request(Methods.POST, service, path, body=body,
+                                 **kwargs)
 
-    async def put(self, service, path, body):
-        """ Make a put request """
+    def put(self, service, path, body, **kwargs):
+        """ Make a put request (this returns a coroutine)"""
+        return self.make_request(Methods.POST, service, path, body=body,
+                                 **kwargs)
 
-    async def patch(self, service, path, body):
-        """ Make a patche requests """
+    def patch(self, service, path, body, **kwargs):
+        """ Make a patche requests (this returns a coroutine)"""
+        return self.make_request(Methods.PATCH, service, path, body=body,
+                                 **kwargs)
 
-    async def delete(self, service, path):
-        """ Make a delete requests """
+    def delete(self, service, path, **kwargs):
+        """ Make a delete requests (this returns a coroutine)"""
+        return self.make_request(Methods.DELETE, service, path, **kwargs)

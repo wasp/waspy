@@ -41,7 +41,7 @@ class RabbitMQTransport(TransportABC):
         self._handler = None
 
     def get_client(self):
-        pass
+        return RabbitMQClientTransport()
 
     async def declare_exchange(self):
         pass

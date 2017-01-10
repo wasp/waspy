@@ -1,11 +1,32 @@
 import traceback
 from typing import List, Union, Iterable
 import asyncio
+from http import HTTPStatus
 
 from .client import Client
 from .webtypes import Request, Response, ResponseError
 from .router import Router
 from waspy.transports.transportabc import TransportABC
+
+
+async def response_wrapper_factory(app, handler):
+    async def wrap_response_middleware(request):
+        response = await handler(request)
+        if not isinstance(response, Response):
+            if isinstance(response, tuple):
+                body = response[0]
+                status = response[1]
+                response = Response(status=status, body=body)
+            elif isinstance(response, dict) or isinstance(response, str):
+                response = Response(body=response)
+            elif response is None:
+                response = Response(status=HTTPStatus.NO_CONTENT)
+            else:
+                raise ValueError('Request handler returned an invalid type.'
+                                 ' Return types should be one of '
+                                 '[Response, dict, str, None, (dict, int)]')
+        return response
+    return wrap_response_middleware
 
 
 class Application:
@@ -23,7 +44,9 @@ class Application:
         if not isinstance(transport, tuple):
             transport = (transport,)
         if middlewares is None:
-            middlewares = []
+            middlewares = ()
+        middlewares = tuple([m for m in middlewares])
+        middlewares += (response_wrapper_factory,)
         if router is None:
             router = Router()
         if default_headers is None:
@@ -79,13 +102,6 @@ class Application:
         try:
             handler = self.router.get_handler_for_request(request)
             response = await handler(request)
-            if not isinstance(response, Response):
-                if isinstance(response, tuple):
-                    body = response[0]
-                    status = response[1]
-                    response = Response(status=status, body=body)
-                elif isinstance(response, dict) or isinstance(response, str):
-                    response = Response(body=response)
 
         except ResponseError as r:
             response = r.response

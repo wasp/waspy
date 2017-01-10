@@ -45,7 +45,8 @@ def test_get_handler(path, expected_handler, expected_params, router):
     request.path = path
     request.path_params = {}
 
-    handler = router.get_handler_for_request(request)
+    wrapped_handler = router.get_handler_for_request(request)
+    handler = request._handler
     assert handler == expected_handler
     for key in expected_params:
         assert key in request.path_params
