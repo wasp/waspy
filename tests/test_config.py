@@ -18,6 +18,7 @@ database:
     username: migration_user
 
 flat: true  # boolean
+flat_with_underscores: hello
 """
     def my_load_config(self):
 
@@ -69,5 +70,15 @@ def test_get_int_from_env_var(config, monkeypatch):
 def test_get_bool_from_env_var(config, monkeypatch):
     monkeypatch.setenv('flat', 'true')
     assert config['flat'] == True
+
+
+def test_get_flat_with_underscores(config):
+    assert config['flat_with_underscores'] == 'hello'
+
+
+def test_get_flat_with_underscores_envvar(config, monkeypatch):
+    monkeypatch.setenv('FLAT_WITH_UNDERSCORES', 'blarg')
+    assert config['flat_with_underscores'] == 'blarg'
+
 
 

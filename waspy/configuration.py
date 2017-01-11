@@ -23,7 +23,8 @@ class ConfigBase:
         if isinstance(default, dict):
             return ConfigSection(self.basename + '.' + item, default)
         # Check for env var
-        envvar_string = '_'.join(self.basename.split('.') + [item]).upper()
+        envvar_string = '_'.join(self.basename.split('.') + [item])\
+            .strip('_').upper()
         env = os.getenv(envvar_string)
         if env is None:
             if default is None:
@@ -50,7 +51,7 @@ class ConfigBase:
 
 class Config(ConfigBase):
     """ load configuration from envvar or config file
-        You can get settings from environment variables or a config.yaml file
+        You can get settings frhelloom environment variables or a config.yaml file
         Environment variables have a higher precedence over the config file
 
         Use `config['section']['subsection']['key']` to get the value
