@@ -80,8 +80,9 @@ class Request:
         if self._cookies is None:
             self._cookies = {}
             for string in self.headers.get('cookie', '').split('; '):
-                key, value = string.split('=')
-                self._cookies[key] = value
+                if '=' in string:
+                    key, value = string.split('=')
+                    self._cookies[key] = value
 
         return self._cookies
 
