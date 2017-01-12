@@ -3,6 +3,8 @@ import io
 import yaml
 
 from waspy.configuration import Config, ConfigError
+
+
 @pytest.fixture
 def config(monkeypatch):
     yaml_string = """
@@ -24,7 +26,7 @@ flat_with_underscores: hello
 
         return yaml.load(io.StringIO(yaml_string))
 
-    monkeypatch.setattr(Config, 'load_config', my_load_config)
+    monkeypatch.setattr(Config, '_load_config', my_load_config)
     return Config()
 
 

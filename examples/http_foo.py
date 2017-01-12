@@ -1,4 +1,8 @@
 #!/bin/env python3
+import os
+
+os.environ['WASPY_CONFIG_LOCATION'] = os.path.join(os.path.dirname(__file__),
+                                                   'config.yaml')
 from waspy import Application
 from waspy.transports import HTTPTransport
 from waspy import config
