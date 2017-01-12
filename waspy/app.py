@@ -6,7 +6,8 @@ from http import HTTPStatus
 from .client import Client
 from .webtypes import Request, Response, ResponseError
 from .router import Router
-from waspy.transports.transportabc import TransportABC
+from .transports.transportabc import TransportABC
+from .configuration import Config
 
 
 async def response_wrapper_factory(app, handler):
@@ -37,7 +38,8 @@ class Application:
                  middlewares: List[callable]=None,
                  default_headers: dict=None,
                  debug: bool=False,
-                 router: Router=None):
+                 router: Router=None,
+                 config: Config=None):
         if transport is None:
             from waspy.transports.httptransport import HTTPTransport
             transport = HTTPTransport()
@@ -51,6 +53,8 @@ class Application:
             router = Router()
         if default_headers is None:
             default_headers = {'Server': 'waspy'}
+        if not config:
+            config = Config()
         self.transport = transport
         self.middlewares = middlewares
         self.default_headers = default_headers
@@ -58,6 +62,7 @@ class Application:
         self.router = router
         self.on_start = []
         self._client = None
+        self.config = config
 
     @property
     def client(self) -> Client:

@@ -5,11 +5,13 @@ os.environ['WASPY_CONFIG_LOCATION'] = os.path.join(os.path.dirname(__file__),
                                                    'config.yaml')
 from waspy import Application
 from waspy.transports import HTTPTransport
-from waspy import config
+from waspy.configuration import Config
 
+config = Config().from_file(os.path.join(os.path.dirname(__file__),
+                                  'config.yaml'))
 PORT = config['http']['port']
 
-app = Application(HTTPTransport(port=PORT, prefix='/api'), debug=False)
+app = Application(HTTPTransport(port=PORT, prefix='/api'), config=config)
 
 
 async def handle_hello(request):
@@ -31,7 +33,7 @@ async def handle_bar(request):
 async def handle_options(request):
     return None, 204
 
-app.router.add_static_route('get', '/hello', handle_hello)
+app.router.add_get('/hello', handle_hello)
 app.router.add_get('/hello/world/i/am/bob', handle_hello)
 app.router.add_get('/foo/:fooid', handle_foo)
 app.router.add_get('/foo/:fooid/bar', handle_bar)

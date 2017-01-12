@@ -6,6 +6,24 @@ CONFIG_LOCATION = os.getenv('WASPY_CONFIG_LOCATION')
 
 class ConfigError(KeyError):
     """ Raised when a requested configuration can not be found """
+    def __init__(self, config_name, env_var):
+        super().__init__("""\
+No configuration found for "{}". \
+Add the environment variable {} or add \
+the key to your config.yaml file.\
+""".format(config_name, env_var))
+
+NO_CONFIG_LOCATION_ERROR_MESSAGE = """
+No config file specified. \
+You can use `app.config.from_file(file_location)` or set a location using \
+the environment variable "WASPY_CONFIG_LOCATION".\
+"""
+
+CONFIG_NOT_YET_LOADED_ERROR_MESSAGE = """
+Configuration file not yet loaded. \
+You should use `[app.]config.from_file(location)` or `[app.]config.load` \
+before trying to access a configuration value.\
+"""
 
 
 class Config:
@@ -25,21 +43,26 @@ class Config:
         self.default_options = _defaults
         self.basename = _basename
 
-    def _load_config(self):
-        if CONFIG_LOCATION is None:
-            raise ValueError('Environment variable "{}" is not set. '
-                             'You must set it before using the config module, '
-                             'ideally in `yourmodule.__init__` file or at '
-                             'the system level'.format('WASPY_CONFIG_LOCATION')
-                             )
-        filepath = os.path.abspath(CONFIG_LOCATION)
+    def from_file(self, location):
+        self._load_config(filepath=location)
+        return self
+
+    def load(self):
+        if self.default_options is None:
+            self._load_config()
+
+    def _load_config(self, filepath=None):
+        if filepath is None:
+            if CONFIG_LOCATION is None:
+                raise ValueError(NO_CONFIG_LOCATION_ERROR_MESSAGE)
+            filepath = os.path.abspath(CONFIG_LOCATION)
         with open(filepath, 'r') as f:
-            config = yaml.load(f)
-            return config
+            config = yaml.safe_load(f)
+            self.default_options = config
 
     def __getitem__(self, item):
         if self.default_options is None:
-            self.default_options = self._load_config()
+            raise ValueError(CONFIG_NOT_YET_LOADED_ERROR_MESSAGE)
         default = self.default_options.get(item)
 
         if isinstance(default, dict):
@@ -49,13 +72,8 @@ class Config:
         env = self._get_env_var(item)
         if env is None:
             if default is None:
-                raise ConfigError(
-                    'No configuration found for "{}". '
-                    'Add the environment variable {} or add'
-                    ' the key to your config.toml file'.format(
-                        self._create_basename(item),
-                        self._create_env_var_string(item)
-                    ))
+                raise ConfigError(self._create_basename(item),
+                                  self._create_env_var_string(item))
             return default
         return env
 

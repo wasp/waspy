@@ -176,7 +176,13 @@ class _HTTPServerProtocol(asyncio.Protocol):
         self.conn.receive_data(data)
 
     async def send_response(self, response: Response):
-        headers = [(name, value) for name, value in response.headers.items()]
+        headers = response.headers
+        if response.content_type:
+            headers['content-type'] = response.content_type
+        if response.correlation_id:
+            headers['X-Correlation-Id'] = response.correlation_id
+        headers = [(name, value) for name, value in headers.items()]
+
         r = h11.Response(status_code=response.status.value, headers=headers,
                          reason=response.status.phrase)
         await self._send(r)
