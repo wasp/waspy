@@ -21,6 +21,6 @@ def test_query_params_multiple():
 def test_cookie_parsing():
     cookie = '__context=eyJTTFQiOiIxNDY0OTAxMjY3NzIyMzg; _numpgs=8; _numsess=2; intercom-id-h=e969; intercom-session-h=R0Y4ee; test1="abc"'
     r = webtypes.Request(headers={'cookie': cookie})
-    assert r.cookies['test1'] == '"abc"'
+    assert r.cookies['test1'] == 'abc'
 
 
