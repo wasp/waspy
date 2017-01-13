@@ -8,11 +8,12 @@ except(IOError, ImportError):
 
 setup(
     name='waspy',
-    version='0.8.2',
+    version='0.8.3',
     install_requires=[
         'h11==0.7.0',
         'aioamqp==0.8.2',
         'pyyaml==3.12',
+        'aenum==1.4.5'
     ],
     packages=['waspy', 'waspy.transports'],
     long_description=long_description,
