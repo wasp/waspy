@@ -1,8 +1,13 @@
 import json
 from collections import defaultdict
 from urllib import parse
+from aenum import extend_enum
 from .router import Methods
 from http import HTTPStatus
+
+extend_enum(HTTPStatus, 'INVALID_REQUEST', (430, 'Invalid Request',
+                                            'Request was syntactically sound, '
+                                            'but failed validation rules'))
 
 
 class QueryParams:

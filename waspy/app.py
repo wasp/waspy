@@ -119,6 +119,8 @@ class Application:
         extra_headers = {}
         if response.data is not None:
             extra_headers['content-length'] = str(len(response.data))
+        else:
+            extra_headers['content-length'] = '0'
 
         response.headers = {**self.default_headers, **extra_headers,
                             **response.headers}

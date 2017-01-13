@@ -30,9 +30,15 @@ async def handle_bar(request):
     barid = request.query.get('bar')
     return {'foo': fooid, 'bar': barid}
 
+
+async def handle_custom(request):
+    return None, 430
+
+
 async def handle_options(request):
     return None, 204
 
+app.router.add_get('/custom', handle_custom)
 app.router.add_get('/hello', handle_hello)
 app.router.add_get('/hello/world/i/am/bob', handle_hello)
 app.router.add_get('/foo/:fooid', handle_foo)
