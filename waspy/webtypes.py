@@ -3,7 +3,7 @@ from collections import defaultdict
 from urllib import parse
 from aenum import extend_enum
 from .router import Methods
-from http import HTTPStatus
+from http import HTTPStatus, cookies
 
 extend_enum(HTTPStatus, 'INVALID_REQUEST', (430, 'Invalid Request',
                                             'Request was syntactically sound, '
@@ -84,11 +84,10 @@ class Request:
     def cookies(self) -> dict:
         if self._cookies is None:
             self._cookies = {}
-            for string in self.headers.get('cookie', '').split('; '):
-                if '=' in string:
-                    key, value = string.split('=')
-                    self._cookies[key] = value
-
+            raw = self.headers.get('cookie', None)
+            if raw:
+                cookie_manager = cookies.SimpleCookie(raw)
+                self._cookies = {i: cookie_manager[i].value for i in cookie_manager}
         return self._cookies
 
     @property
