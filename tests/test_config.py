@@ -23,11 +23,12 @@ flat: true  # boolean
 flat_with_underscores: hello
 """
     def my_load_config(self):
-
-        return yaml.load(io.StringIO(yaml_string))
+        self.default_options = yaml.load(io.StringIO(yaml_string))
 
     monkeypatch.setattr(Config, '_load_config', my_load_config)
-    return Config()
+    config_ = Config()
+    config_.load()
+    return config_
 
 
 def test_get_config_file(config):
