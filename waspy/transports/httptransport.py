@@ -220,14 +220,14 @@ class _HTTPServerProtocol(asyncio.Protocol):
             if type(event) is h11.EndOfMessage:
                 break
             body += event.data
-
+        correlation_id = headers.get('x-correlation-id')
         return Request(
             headers=headers,
             method=method,
             query_string=query,
             path=path,
             body=body,
-            correlation_id=None
+            correlation_id=correlation_id
         )
 
     async def next_event(self):

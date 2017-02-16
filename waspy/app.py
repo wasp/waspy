@@ -1,4 +1,4 @@
-import traceback
+import sys
 from typing import List, Union, Iterable
 import asyncio
 from http import HTTPStatus
@@ -7,7 +7,8 @@ from .client import Client
 from .webtypes import Request, Response, ResponseError
 from .router import Router
 from .transports.transportabc import TransportABC
-from .configuration import Config
+from .configuration import Config, ConfigError
+from . import errorlogging
 
 
 async def response_wrapper_factory(app, handler):
@@ -63,6 +64,8 @@ class Application:
         self.on_start = []
         self._client = None
         self.config = config
+        self.raven = None
+        self.logger = None
 
     @property
     def client(self) -> Client:
@@ -72,6 +75,9 @@ class Application:
 
     def run(self):
         loop = asyncio.get_event_loop()
+        # init logger
+        self._create_logger()
+
         # wrap handlers in middleware
         loop.run_until_complete(self._wrap_handlers())
         for t in self.transport:
@@ -101,17 +107,17 @@ class Application:
         implementation to handle the actual request.
         It returns a webtype.Response object.
         """
-        # ToDo: Send through middlewares
-        # response = Response(headers={'hello': 'world'}, body={'foo': 'bar'})
         # Get handler
         try:
             handler = self.router.get_handler_for_request(request)
+            request.app = self
             response = await handler(request)
 
         except ResponseError as r:
             response = r.response
-        except Exception as e:
-            traceback.print_exc()
+        except Exception:
+            exec_info = sys.exc_info()
+            self.logger.log_exception(request, exec_info)
             response = Response(status=500)
         if not response.correlation_id:
             response.correlation_id = request.correlation_id
@@ -139,4 +145,19 @@ class Application:
                 handler = handler_gen.send(wrapped)
         except StopIteration:
             pass
+
+    def _create_logger(self):
+        try:
+            dsn = self.config['sentry']['dsn']
+        except ConfigError:
+            self.logger = errorlogging.ErrorLoggingBase()
+        else:
+            try:
+                env = self.config['app_env']
+            except ConfigError:
+                env = 'waspy'
+            self.logger = errorlogging.SentryLogging(
+                dsn=dsn,
+                environment=env
+            )
 

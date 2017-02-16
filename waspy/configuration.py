@@ -93,15 +93,16 @@ class Config:
         envvar_string = self._create_env_var_string(item)
         env = os.getenv(envvar_string)
         if env is not None:
-            # env vars are always passed in as strings in docker world
-            # here we will try to convert them to basic types if we can
-            if env.lower() == 'true':
-                env = True
-            if env.lower() == 'false':
-                env = False
-            try:
-                env = int(env)
-            except ValueError:
-                pass
+            if isinstance(env, str):
+                # env vars are always passed in as strings in docker world
+                # here we will try to convert them to basic types if we can
+                if env.lower() == 'true':
+                    return True
+                if env.lower() == 'false':
+                    return False
+                try:
+                    env = int(env)
+                except ValueError:
+                    pass
         return env
 
