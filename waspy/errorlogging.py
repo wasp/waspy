@@ -33,6 +33,7 @@ class SentryLogging(ErrorLoggingBase):
                 'query_string': request.query_string,
                 'url': '/' + request.path.replace('.', '/'),
                 'content-type': request.content_type,
+                'headers': request.headers
             },
             'user': {
             }
