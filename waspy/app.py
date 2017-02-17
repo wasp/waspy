@@ -2,6 +2,7 @@ import sys
 from typing import List, Union, Iterable
 import asyncio
 from http import HTTPStatus
+from concurrent.futures import CancelledError
 
 from .client import Client
 from .webtypes import Request, Response, ResponseError
@@ -115,9 +116,16 @@ class Application:
 
         except ResponseError as r:
             response = r.response
+            if r.log:
+                exc_info = sys.exc_info()
+                self.logger.log_exception(request, exc_info, level='warning')
+        except CancelledError:
+            # This error can happen if a client closes the connection
+            # The response shouldnt really ever be used
+            return None
         except Exception:
-            exec_info = sys.exc_info()
-            self.logger.log_exception(request, exec_info)
+            exc_info = sys.exc_info()
+            self.logger.log_exception(request, exc_info)
             response = Response(status=500)
         if not response.correlation_id:
             response.correlation_id = request.correlation_id

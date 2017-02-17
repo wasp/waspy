@@ -166,10 +166,20 @@ class Response:
 
 
 class ResponseError(Exception):
-    def __init__(self, status, *, body=None, headers=None,
-                 correlation_id=None, reason=None):
-        super().__init__()
+    def __init__(self, message=None, status=None, *, body=None, headers=None,
+                 correlation_id=None, reason=None, log=False):
+        super().__init__(message)
+        self.message = message
+        if hasattr(self, 'status') and status is None:
+            status = self.status
+        if hasattr(self, 'body') and body is None:
+            body = self.body
+        if hasattr(self, 'reason') and reason is None:
+            reason = self.reason
+        if hasattr(self, 'log') and log == False:
+            log = self.log
         if reason and not body:
             body = {'reason': reason}
         self.response = Response(status=status, body=body, headers=headers,
                                  correlation_id=correlation_id)
+        self.log = log

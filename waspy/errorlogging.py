@@ -5,10 +5,13 @@ logger = logging.getLogger('waspy')
 
 
 class ErrorLoggingBase:
-    def log_exception(self, request, exc_info):
-        logger.error('An error occurred while handling request: {}'
-                     .format(request),
-                     exc_info=exc_info)
+    def log_exception(self, request, exc_info, level='error'):
+        logger.log(level, 'An error occurred while handling request: {}'
+                   .format(request),
+                   exc_info=exc_info)
+
+    def log_warning(self, request, message):
+        logger.warning(message)
 
 
 class SentryLogging(ErrorLoggingBase):
@@ -23,9 +26,7 @@ class SentryLogging(ErrorLoggingBase):
         self.raven = Client(dsn, environment=environment)
         self.raven.transaction.clear()
 
-    def log_exception(self, request, exc_info):
-        super().log_exception(request, exc_info)
-
+    def _get_sentry_details(self, request, exc_info):
         data = {
             'request': {
                 'method': request.method.value,
@@ -46,8 +47,19 @@ class SentryLogging(ErrorLoggingBase):
         }
 
         self.add_context_data(request, data, tags, extra_data, exc_info)
-        self.raven.captureException(data=data, extra=extra_data, tags=tags,
-                                    exc_info=exc_info, duration=20)
+        return data, tags, extra_data
+
+    def log_warning(self, request, message=None):
+        super().log_warning(request, message=message)
+        data, tags, extra = self._get_sentry_details(request, None)
+        self.raven.captureMessage(message, data=data, extra=extra, tags=tags)
+
+    def log_exception(self, request, exc_info, level='error'):
+        super().log_exception(request, exc_info)
+
+        data, tags, extra = self._get_sentry_details(request, exc_info)
+        self.raven.captureException(data=data, extra=extra, tags=tags,
+                                    exc_info=exc_info, level=level)
 
     def add_context_data(self, request, data, tags, extra_data, exc_info):
         """
