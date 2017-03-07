@@ -100,7 +100,10 @@ class Request:
     def json(self) -> dict:
         if not self._json:
             # convert body into a json dict
-            self._json = json.loads(self.body.decode())
+            try:
+                self._json = json.loads(self.body.decode())
+            except json.JSONDecodeError as ex:
+                raise JSONDecodeError from ex
         return self._json
 
     def get_path_var(self, key, default=None):
@@ -183,3 +186,8 @@ class ResponseError(Exception):
         self.response = Response(status=status, body=body, headers=headers,
                                  correlation_id=correlation_id)
         self.log = log
+
+
+class JSONDecodeError(ResponseError):
+    status = 400
+    reason = 'Invalid Json'

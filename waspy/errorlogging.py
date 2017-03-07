@@ -6,6 +6,11 @@ logger = logging.getLogger('waspy')
 
 class ErrorLoggingBase:
     def log_exception(self, request, exc_info, level='error'):
+        try:
+            level = getattr(logging, level.upper())
+        except:
+            level = logging.ERROR
+
         logger.log(level, 'An error occurred while handling request: {}'
                    .format(request),
                    exc_info=exc_info)
@@ -55,7 +60,7 @@ class SentryLogging(ErrorLoggingBase):
         self.raven.captureMessage(message, data=data, extra=extra, tags=tags)
 
     def log_exception(self, request, exc_info, level='error'):
-        super().log_exception(request, exc_info)
+        super().log_exception(request, exc_info, level=level)
 
         data, tags, extra = self._get_sentry_details(request, exc_info)
         self.raven.captureException(data=data, extra=extra, tags=tags,

@@ -9,8 +9,9 @@ from ..webtypes import Request, Response
 
 
 class RabbitMQClientTransport(ClientTransportABC):
-    def __init__(self):
-        raise NotImplementedError
+    def __init__(self, channel):
+        self.channel = channel
+
 
     def make_request(self, service: str, method: str, path: str,
                      body: bytes = None, query: str = None,
@@ -41,7 +42,7 @@ class RabbitMQTransport(TransportABC):
         self._handler = None
 
     def get_client(self):
-        return RabbitMQClientTransport()
+        return RabbitMQClientTransport(self.channel)
 
     async def declare_exchange(self):
         pass
