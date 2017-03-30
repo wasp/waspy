@@ -2,9 +2,20 @@ from enum import Enum
 
 from waspy import webtypes
 
+"""
+The below constant is special key in the router dictionary that determines an
+id section of the url. The / character is the only character that
+can't possibly be used in a url path or id, since it is the path delimiter.
+Therefore, there are '/' characters in the key, so that it can never 
+accidentally be overridden.
 
-class NonRESTfulURLError(NotImplementedError):
-    """ URL provided is not restful. """
+p.s. '_id' is to make the dictionary slightly more readable when debugging
+"""
+ID_KEY = '/_id/'
+
+
+class NotAValidURLError(Exception):
+    """ When a url path syntax is not valid """
 
 
 class Methods(Enum):
@@ -57,7 +68,7 @@ class Router:
         path = request.path
         route = path.lstrip('/').replace('/', '.')
         if method == Methods.OPTIONS and self.options_handler is not None:
-            # Is this an OPTSION and do we have a generic options handler?
+            # Is this an OPTION and do we have a generic options handler?
             request._handler = self.options_handler
             return self.options_handler
 
@@ -72,9 +83,15 @@ class Router:
         try:
             for portion in route.split('.'):
                 sub = d.get(portion, None)
-                if sub is None:
-                    sub = d['_id']
-                    params.append(portion)
+                if sub is None:  # must be an ID field
+                    key = ID_KEY
+                    param = portion
+                    if ':' in portion:
+                        param, action = portion.split(':', 1)
+                        key += ':' + action
+
+                    sub = d[key]
+                    params.append(param)
                 d = sub
             wrapped, handler, keys = d[method]
         except KeyError:
@@ -113,10 +130,17 @@ class Router:
         d = self._routes
         params = []
         for portion in route.split('.'):
-            if (portion.startswith(':') or
-                    (portion.startswith('{') and portion.endswith('}'))):
-                params.append(portion.strip(':').strip('{}'))
-                key = '_id'
+            if portion.startswith('{') and '}' in portion:
+                sections = portion.lstrip('{').split('}', maxsplit=1)
+                params.append(sections[0])
+                key = ID_KEY
+                if sections[1]:
+                    if not sections[1].startswith(':'):
+                        raise NotAValidURLError(
+                            'Cant have an id mixed with '
+                            'a static word without a colon')
+                    key += sections[1]
+
             else:
                 key = portion
             if key not in d:
