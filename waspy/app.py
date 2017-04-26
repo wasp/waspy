@@ -1,6 +1,7 @@
 import sys
-from typing import List, Union, Iterable
 import asyncio
+import signal
+from typing import List, Union, Iterable
 from http import HTTPStatus
 from concurrent.futures import CancelledError
 
@@ -74,7 +75,15 @@ class Application:
             self._client = Client(transport=self.transport[0].get_client())
         return self._client
 
+    def start_shutdown(self, signum=None, frame=None):
+        print('Starting Shutdown')
+        # loop = asyncio.get_event_loop()
+        for t in self.transport:
+            t.shutdown()
+
     def run(self):
+        # first, lets make the signals kill us
+
         loop = asyncio.get_event_loop()
         # init logger
         self._create_logger()
@@ -89,18 +98,20 @@ class Application:
             loop.run_until_complete(coro(self))
 
         # todo: fork/add processes?
+        tasks = []
         for t in self.transport:
-            t.start(self.handle_request, loop=loop)
-        try:
-            loop.run_forever()
-        except KeyboardInterrupt:
-            print('Shutting down')
-        for t in self.transport:
-            t.shutdown(loop=loop)
+            tasks.append(t.start(self.handle_request))
+
+        # register signals, so that stopping the service works correctly
+        loop.add_signal_handler(signal.SIGTERM, self.start_shutdown)
+        loop.add_signal_handler(signal.SIGINT, self.start_shutdown)
+
+        # Run all transports
+        loop.run_until_complete(asyncio.gather(*tasks))
 
         # todo: Call on-shutdown hooks
 
-        loop.close()
+        # exit
 
     async def handle_request(self, request: Request) -> Response:
         """
@@ -110,15 +121,19 @@ class Application:
         """
         # Get handler
         try:
-            handler = self.router.get_handler_for_request(request)
-            request.app = self
-            response = await handler(request)
+            try:
+                handler = self.router.get_handler_for_request(request)
+                request.app = self
+                response = await handler(request)
 
-        except ResponseError as r:
-            response = r.response
-            if r.log:
-                exc_info = sys.exc_info()
-                self.logger.log_exception(request, exc_info, level='warning')
+            except ResponseError as r:
+                response = r.response
+                if r.log:
+                    exc_info = sys.exc_info()
+                    self.logger.log_exception(request, exc_info, level='warning')
+            # invoke serialization (json) to make sure it works
+            _ = response.data
+
         except CancelledError:
             # This error can happen if a client closes the connection
             # The response shouldnt really ever be used
@@ -129,15 +144,9 @@ class Application:
             response = Response(status=500)
         if not response.correlation_id:
             response.correlation_id = request.correlation_id
-        # add default headers
-        extra_headers = {}
-        if response.data is not None:
-            extra_headers['content-length'] = str(len(response.data))
-        else:
-            extra_headers['content-length'] = '0'
 
-        response.headers = {**self.default_headers, **extra_headers,
-                            **response.headers}
+        # add default headers
+        response.headers = {**self.default_headers, **response.headers}
 
         return response
 
@@ -157,12 +166,12 @@ class Application:
     def _create_logger(self):
         try:
             dsn = self.config['sentry']['dsn']
-        except ConfigError:
+        except (ConfigError, ValueError):
             self.logger = errorlogging.ErrorLoggingBase()
         else:
             try:
                 env = self.config['app_env']
-            except ConfigError:
+            except (ConfigError):
                 env = 'waspy'
             self.logger = errorlogging.SentryLogging(
                 dsn=dsn,

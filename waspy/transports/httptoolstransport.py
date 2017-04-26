@@ -1,3 +1,8 @@
+"""
+This is a rewrite of the HTTP transport to use httptools parser (faster)
+It is currently incomplete and should not be used
+"""
+
 import asyncio
 import socket
 
@@ -67,8 +72,6 @@ class HTTPClientTransport(ClientTransportABC):
             headers['Content-Type'] = content_type
         if body:
             headers['Content-Length'] = str(len(body))
-        else:
-            headers['Content-Length'] = '0'
 
         # now make a connection and send it
         connection = _HTTPClientConnection(service, port)
@@ -84,6 +87,7 @@ class HTTPClientTransport(ClientTransportABC):
         assert type(response) is h11.Response
 
         # form response object
+
         status_code = response.status_code
         headers = response.headers
 
@@ -118,6 +122,7 @@ class HTTPTransport(TransportABC):
         self._done_future = asyncio.Future()
 
     def listen(self, *, loop: asyncio.AbstractEventLoop):
+
         coro = asyncio.start_server(
             self.handle_incoming_request, '0.0.0.0', self.port, loop=loop)
         self._server = loop.run_until_complete(coro)
@@ -167,10 +172,10 @@ class _HTTPServerProtocol(asyncio.Protocol):
     """ HTTP Protocol handler.
         Should only be used by HTTPServerTransport
     """
-    __slots__ = ('conn', 'reader', 'writer')
+    __slots__ = ('request', 'reader', 'writer', 'prefix')
 
     def __init__(self, reader=None, writer=None, prefix=None):
-        self.conn = h11.Connection(h11.SERVER)
+        self.request = Request()
         self.reader = reader
         self.writer = writer
         self.prefix = prefix
@@ -191,10 +196,6 @@ class _HTTPServerProtocol(asyncio.Protocol):
             headers['content-type'] = response.content_type
         if response.correlation_id:
             headers['X-Correlation-Id'] = response.correlation_id
-        if response.data:
-            headers['content-length'] = str(len(response.data))
-        else:
-            headers['content-length'] = '0'
         headers = [(name, value) for name, value in headers.items()]
 
         r = h11.Response(status_code=response.status.value, headers=headers,
@@ -251,3 +252,27 @@ class _HTTPServerProtocol(asyncio.Protocol):
                 await self._read()
             else:
                 return event
+
+    def on_message_begin(self):
+        print('on_message_begin')
+
+    def on_header(self, name: bytes, value: bytes):
+        print('on_header')
+
+    def on_headers_complete(self):
+        print('on headers complete')
+
+    def on_body(self, body: bytes):
+        print('on body')
+
+    def on_message_complete(self):
+        print('on message complete')
+
+    def on_chunk_header(self):
+        print('on chunck header')
+
+    def on_chunk_complete(self):
+        print('on chunck complete')
+
+    def on_url(self):
+        print('on url')

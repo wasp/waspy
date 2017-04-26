@@ -13,7 +13,7 @@ rabbit = RabbitMQTransport(
 )
 http = HTTPTransport(port=8080)
 
-app = Application((http, rabbit), debug=False)
+app = Application((rabbit, http), debug=False)
 
 async def on_startup(app):
     await rabbit.bind_to_exchange(exchange='amq.topic', routing_key='#')
@@ -37,7 +37,14 @@ async def foo_middleware_factory(app, handler):
         response.header['set-auth'] = 'true'
 
 
+async def handle_hello2(request):
+    print(request.__dict__)
+    return {'hello': 'world2'}
+
 async def handle_hello(request: Request):
+    client = request.app.client
+    response = await client.post('', '/hello2', {'some': 'object'})
+    print(response)
     return {'hello': 'world'}  # return a dict, it gets parsed to json
 
 async def handle_foo(request: Request):
@@ -51,7 +58,8 @@ async def handle_bar(request: Request) -> Response:
         # or you can return a response object to include more info
         # such as headers
 
-app.router.add_static_route('get', '/hello', handle_hello)
+app.router.add_get('/hello', handle_hello)
+app.router.add_post('/hello2', handle_hello2)
 app.router.add_get('/foo/:fooid', handle_foo)
 app.router.add_get('/foo/:fooid/bar', handle_bar)
 

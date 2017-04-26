@@ -1,8 +1,8 @@
-import weakref
+import asyncio
+import uuid
 
 import aioamqp
 from aioamqp.channel import Channel
-import asyncio
 
 from .transportabc import TransportABC, ClientTransportABC
 from ..webtypes import Request, Response
@@ -11,13 +11,70 @@ from ..webtypes import Request, Response
 class RabbitMQClientTransport(ClientTransportABC):
     def __init__(self, channel):
         self.channel = channel
+        self._response_futures = {}
+        self.response_queue_name = str(uuid.uuid1()).encode()
+        self._consumer_tag = None
 
-
-    def make_request(self, service: str, method: str, path: str,
+    async def make_request(self, service: str, method: str, path: str,
                      body: bytes = None, query: str = None,
                      headers: dict = None, correlation_id: str = None,
                      content_type: str = None, **kwargs):
-        raise NotImplementedError
+
+        if not self._consumer_tag:
+            await self.start()
+        path = path.replace('/', '.').lstrip('.')
+        if headers is None:
+            headers = {}
+        if query:
+            headers['x-wasp-query-string'] = query
+
+        if not body:
+            body = b'None'
+        message_id = str(uuid.uuid4())
+        properties = {
+            'headers': headers,
+            'reply_to': self.response_queue_name,
+            'correlation_id': correlation_id,
+            'message_id': message_id,
+            'expiration': '30000',
+            'type': method,
+            'app_id': 'hello',
+        }
+        if content_type:
+            properties['content_type'] = content_type
+
+        await self.channel.basic_publish(exchange_name='amq.topic',
+                                         routing_key=path,
+                                         properties=properties,
+                                         payload=body)
+
+        future = asyncio.Future()
+        self._response_futures[message_id] = future
+        return await future
+
+    async def start(self):
+        await self.channel.queue_declare(queue_name=self.response_queue_name,
+                                         durable=False,
+                                         exclusive=True,
+                                         auto_delete=True)
+        self._consumer_tag = (await self.channel.basic_consume(
+            self.handle_responses,
+            queue_name=self.response_queue_name,
+            no_ack=True)).get('consumer_tag')
+
+    async def handle_responses(self, channel, body, envelope, properties):
+        future = self._response_futures[properties.message_id]
+
+        headers = properties.headers
+        status = headers.pop('Status')
+
+        response = Response(headers=headers,
+                            correlation_id=properties.correlation_id,
+                            body=body,
+                            status=status,
+                            content_type=properties.content_type)
+
+        future.set_result(response)
 
 
 class RabbitMQTransport(TransportABC):
@@ -40,6 +97,7 @@ class RabbitMQTransport(TransportABC):
         self._consumer_tag = None
         self._counter = 0
         self._handler = None
+        self._done_future = asyncio.Future()
 
     def get_client(self):
         return RabbitMQClientTransport(self.channel)
@@ -55,19 +113,27 @@ class RabbitMQTransport(TransportABC):
                                       queue_name=self.queue,
                                       routing_key=routing_key)
 
-    def start(self, handler, *, loop):
+    async def start(self, handler):
         self._handler = handler
-        self._loop = loop
-        async def consume():
-            # Need to reconnect because of potential forking affects
-            await self.close()
-            await self.connect(loop=loop)
-            self._consumer_tag = (await self.channel.basic_consume(
-                self.handle_request,
-                queue_name=self.queue,
-                no_ack=True)).get('consumer_tag')
+        # Need to reconnect because of potential forking affects
+        await self.close()
+        await self.connect()
+        self._consumer_tag = (await self.channel.basic_consume(
+            self.handle_request,
+            queue_name=self.queue,
+            no_ack=True)).get('consumer_tag')
 
-        loop.run_until_complete(consume())
+        try:
+            await self._done_future
+        except asyncio.CancelledError:
+            pass
+
+        print('shutting down rabbit')
+        # shutting down
+        await self.channel.basic_cancel(self._consumer_tag)
+
+        while self._counter > 0:
+            await asyncio.sleep(1)
 
     def listen(self, *, loop):
         async def setup():
@@ -115,10 +181,11 @@ class RabbitMQTransport(TransportABC):
         route = envelope.routing_key
         print(route)
         headers = properties.headers or {}
-        query = headers.pop('query', '').lstrip('?')
+        query = headers.pop('x-wasp-query-string', '').lstrip('?')
         headers['content-type'] = properties.content_type
         headers['content-encoding'] = properties.content_encoding
         correlation_id = properties.correlation_id
+        message_id = properties.message_id
         reply_to = properties.reply_to
         method = properties.type
 
@@ -138,21 +205,23 @@ class RabbitMQTransport(TransportABC):
 
         response.headers['Status'] = str(response.status.value)
 
+        payload = response.data or b'None'
+
         properties = {
             'correlation_id': response.correlation_id,
             'headers': response.headers,
-            'content_type': response.content_type
+            'content_type': response.content_type,
+            'message_id': message_id
         }
-        await channel.basic_publish(response.data, '', reply_to,
+        await channel.basic_publish(exchange_name='',
+                                    payload=payload,
+                                    routing_key=reply_to,
                                     properties=properties)
         self._counter -= 1
 
-    def shutdown(self, *, loop):
-        loop.run_until_complete(self.channel.basic_cancel(self._consumer_tag))
-        async def finish_tasks():
-            while self._counter > 0:
-                await asyncio.sleep(1)
-        loop.run_until_complete(finish_tasks())
-        loop.run_until_complete(self.close())
+    def shutdown(self):
+        print('Rabbit got shutdown signal')
+        self._done_future.cancel()
+
 
 

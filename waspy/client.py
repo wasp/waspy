@@ -2,6 +2,8 @@ import json
 from urllib import parse
 import uuid
 
+import asyncio
+
 from .webtypes import QueryParams, Request, Methods
 
 
@@ -15,13 +17,13 @@ class Client:
             transport = HTTPClientTransport(**kwargs)
         self.transport = transport
 
-    async def make_request(self, method, service, path, body=None,
+    def make_request(self, method, service, path, body=None,
                            query_params: QueryParams=None,
                            headers: dict=None,
                            correlation_id: str=None,
                            content_type: str='application/json',
                            context: Request=None,
-                           **kwargs):
+                           **kwargs) -> asyncio.coroutine:
         """
         Make a request to another service. If `context` is provided, then
         context and correlation will be pulled from the provided request
@@ -58,14 +60,14 @@ class Client:
                 correlation_id = context.correlation_id
 
         if not correlation_id:
-            correlation_id = uuid.uuid4()
+            correlation_id = str(uuid.uuid4())
         if isinstance(body, str):
             body = body.encode()
-        response = await self.transport.make_request(
-            service, method, path, body=body, query=query_string,
+        response = self.transport.make_request(
+            service, method.name, path, body=body, query=query_string,
             headers=headers, correlation_id=correlation_id,
             content_type=content_type, **kwargs)
-        return response
+        return response  # response is a coroutine that must be awaited
 
     def get(self, service, path, **kwargs):
         """ Make a get request (this returns a coroutine)"""

@@ -43,15 +43,15 @@ class TransportABC(ABC):
         """
 
     @abstractmethod
-    def start(self, request_handler: callable, *, loop):
+    async def start(self, request_handler: callable):
         """ This method does things needed before we run
         Like "listen" but you get the app object,
-        and it happens after the fork
+        and it happens after the fork. This is a corousine
         """
 
     def get_client(self):
         raise NotImplementedError
 
     @abstractmethod
-    def shutdown(self, *, loop):
-        """ Allows you to close up shop and shut down gracefully"""
+    def shutdown(self):
+        """ Signals that we are shutting down """
