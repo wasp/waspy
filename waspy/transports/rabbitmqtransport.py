@@ -16,9 +16,9 @@ class RabbitMQClientTransport(ClientTransportABC):
         self._consumer_tag = None
 
     async def make_request(self, service: str, method: str, path: str,
-                     body: bytes = None, query: str = None,
-                     headers: dict = None, correlation_id: str = None,
-                     content_type: str = None, **kwargs):
+                           body: bytes = None, query: str = None,
+                           headers: dict = None, correlation_id: str = None,
+                           content_type: str = None, **kwargs):
 
         if not self._consumer_tag:
             await self.start()
@@ -211,7 +211,8 @@ class RabbitMQTransport(TransportABC):
             'correlation_id': response.correlation_id,
             'headers': response.headers,
             'content_type': response.content_type,
-            'message_id': message_id
+            'message_id': message_id,
+            'expiration': '30000',
         }
         await channel.basic_publish(exchange_name='',
                                     payload=payload,

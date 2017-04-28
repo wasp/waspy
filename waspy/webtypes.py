@@ -106,15 +106,11 @@ class Request:
                 raise JSONDecodeError from ex
         return self._json
 
-    def get_path_var(self, key, default=None):
-        return self.path_params.get(key, default=default)
-
     def __str__(self):
         query = '?' + self.query_string if self.query_string else ''
         return('<Request({method} {path}{query})@{id}>'
                .format(method=self.method, path=self.path,
-                       query=query , id=id(self)))
-
+                       query=query, id=id(self)))
 
 class Response:
     def __init__(self, headers=None, correlation_id=None,
