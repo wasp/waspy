@@ -19,23 +19,30 @@ This project is currently in alpha state.
 There are a lot of features missing.
 
 Features for beta:
-- [x]: HTTP Transport
-- [x]: Routing
-- [x]: RabbitMQ transporty
-- [x]: Support middlewares
-- [x]: Client library (for calling other services)
-- [x]: HTTP client transport (with envvar service discovery)
-- [ ]: RabbitMQ client transport
+- [x] HTTP Transport
+- [x] Routing
+- [x] RabbitMQ transporty
+- [x] Support middlewares
+- [x] Client library (for calling other services)
+- [x] HTTP client transport (with envvar service discovery)
+- [x] RabbitMQ client transport
+- [ ] Test everything
+
+note: all alpha features are complete, but I am still in the process of adding more robusts tests. Until that is done, waspy will remain in alpha and api's might change.
  
 Wish List:
-- [ ]: Transport classes for nats (nats.io)
-- [ ]: Transport classes for kafka
-- [ ]: pattern for synchronous "worker-tier"
-- [ ]: decorators for adding routes
-- [ ]: configuration package
-- [ ]: auto-reloading when in debug mode
-- [ ]: sentry integration
-- [ ]: jwt handling
+- [ ] Transport classes for nats (nats.io)
+- [ ] Transport classes for kafka
+- [ ] pattern for synchronous "worker-tier"
+- [x] configuration package
+- [ ] auto-reloading when in debug mode
+- [x] sentry integration
+- [ ] jwt handling
+
+Features for GA (1.0):
+- [ ] High level "Falcon-like" api for writing RESTFUL endpoints even easier!
+- [ ] High level can be overridden by lower level for control/performance reasons
+- [ ] Stable/proven API
 
 ## License
 Apache-2.0
