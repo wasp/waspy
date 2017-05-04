@@ -136,8 +136,12 @@ class HTTPTransport(TransportABC):
             await self._done_future
         except asyncio.CancelledError:
             pass
+        # we should wait some time for connections to stop
+        await asyncio.sleep(3)
+
         print('shutting down http')
         # shutting down
+        self._server.close()
         await self._server.wait_closed()
 
     async def handle_incoming_request(self, reader, writer):
@@ -158,7 +162,6 @@ class HTTPTransport(TransportABC):
         writer.close()
 
     def shutdown(self):
-        self._server.close()
         self._done_future.cancel()
 
     def _set_tcp_nodelay(self, writer):
