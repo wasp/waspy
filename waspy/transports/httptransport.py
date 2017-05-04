@@ -3,7 +3,7 @@ import socket
 
 import h11
 
-from ..webtypes import Request, Response
+from ..webtypes import Request, Response, ResponseError
 from .transportabc import TransportABC, ClientTransportABC
 
 
@@ -22,8 +22,14 @@ class _HTTPClientConnection:
         self.conn = h11.Connection(our_role=h11.CLIENT)
 
     async def connect(self):
-        self.reader, self.writer = await \
-            asyncio.open_connection(self.service, self.port)
+        try:
+            self.reader, self.writer = await \
+                asyncio.open_connection(self.service, self.port)
+        except socket.gaierror as e:
+            raise ResponseError(e.strerror,
+                                reason='Can not connect to service {service}.'
+                                       .format(service=self.service),
+                                status=503)
 
     def send(self, event):
         data = self.conn.send(event)
@@ -60,7 +66,7 @@ class HTTPClientTransport(ClientTransportABC):
         headers['Host'] = service
         headers['Connection'] = 'close'
         if correlation_id:
-            headers['X-Correlation-Id'] = correlation_id
+            headers['X-Correlation-Id'] = str(correlation_id)
         if query:
             path += '?' + query
         if content_type:
@@ -85,7 +91,8 @@ class HTTPClientTransport(ClientTransportABC):
 
         # form response object
         status_code = response.status_code
-        headers = response.headers
+        headers = {name.decode('ascii'): value.decode('ascii')
+                   for name, value in response.headers}
 
         result = Response(headers=headers, correlation_id=correlation_id,
                           status=status_code)
@@ -95,7 +102,7 @@ class HTTPClientTransport(ClientTransportABC):
         while type(event) is not h11.EndOfMessage:
             event = await connection.next_event()
             if type(event) is h11.Data:
-                body += body
+                body += event.data
 
         result.body = body
         connection.close()
