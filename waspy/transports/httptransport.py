@@ -123,6 +123,7 @@ class HTTPTransport(TransportABC):
         self._handler = None
         self._server = None
         self._done_future = asyncio.Future()
+        self._count = 0
 
     def listen(self, *, loop: asyncio.AbstractEventLoop):
         coro = asyncio.start_server(
@@ -137,7 +138,10 @@ class HTTPTransport(TransportABC):
         except asyncio.CancelledError:
             pass
         # we should wait some time for connections to stop
-        await asyncio.sleep(3)
+        while self._count > 1:
+            print(self._count)
+            await asyncio.sleep(1)
+
 
         print('shutting down http')
         # shutting down
@@ -148,18 +152,22 @@ class HTTPTransport(TransportABC):
         self._set_tcp_nodelay(writer)
         protocol = _HTTPServerProtocol(reader=reader, writer=writer,
                                        prefix=self.prefix)
-
         try:
             while True:
                 request = await protocol.get_request()
+                self._count += 1
+                print('in', self._count)
                 response = await self._handler(request)
                 await protocol.send_response(response)
                 if protocol.conn.our_state is h11.MUST_CLOSE:
                     break
                 protocol.conn.start_next_cycle()
+                self._count -= 1
+                print('out', self._count)
         except (ClosedError, ConnectionResetError):
             pass
-        writer.close()
+        finally:
+            writer.close()
 
     def shutdown(self):
         self._done_future.cancel()
