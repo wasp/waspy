@@ -3,9 +3,15 @@ import os
 
 os.environ['WASPY_CONFIG_LOCATION'] = os.path.join(os.path.dirname(__file__),
                                                    'config.yaml')
+
+import asyncio
 from waspy import Application
-from waspy.transports import HTTPTransport
+# from waspy.transports import HTTPTransport
+from waspy.transports.httptoolstransport import HTTPTransport
 from waspy.configuration import Config
+import uvloop
+
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 config = Config().from_file(os.path.join(os.path.dirname(__file__),
                                   'config.yaml'))

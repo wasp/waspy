@@ -64,12 +64,11 @@ class Request:
             headers = {}
         if not method:
             method = 'GET'
-        if isinstance(method, str):
-            method = Methods(method.upper())
+        self._method = None
         self.headers = headers
         self.path = path
         self.correlation_id = correlation_id
-        self.method = method
+        self.method = method  # this is a property setter
         self.query_string = query_string
         self._query_params = None
         self.body = body
@@ -79,6 +78,16 @@ class Request:
         self.content_type = content_type
         self._json = None
         self._cookies = None
+
+    @property
+    def method(self):
+        return self._method
+
+    @method.setter
+    def method(self, value):
+        if isinstance(value, str):
+            value = Methods(value.upper())
+        self._method = value
 
     @property
     def cookies(self) -> dict:

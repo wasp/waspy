@@ -115,15 +115,27 @@ class HTTPTransport(TransportABC):
     def get_client(self):
         return HTTPClientTransport()
 
-    def __init__(self, port=8080, prefix=None):
+    def __init__(self, port=8080, prefix=None, shutdown_grace_period=15):
+        """
+        HTTP Transport for listening on http
+        :param port: The port to lisen on (0.0.0.0 will always be used)
+        :param prefix: the path prefix to remove from all url's
+        :param shutdown_grace_period: Time to wait for server to shutdown
+        before connections get forceably closed. The only way for connections
+        to not be forcibly closed is to have some connection draining in front
+        of the service for deploys. Most docker schedulers will do this for you.
+        """
         self.port = port
         if prefix is None:
             prefix = ''
         self.prefix = prefix
+        self.shutdown_grace_period = shutdown_grace_period
         self._handler = None
         self._server = None
         self._done_future = asyncio.Future()
         self._count = 0
+        self._shutting_down = False
+        self._sleeping_connections = set()
 
     def listen(self, *, loop: asyncio.AbstractEventLoop):
         coro = asyncio.start_server(
@@ -137,34 +149,56 @@ class HTTPTransport(TransportABC):
             await self._done_future
         except asyncio.CancelledError:
             pass
-        # we should wait some time for connections to stop
-        while self._count > 1:
-            print(self._count)
-            await asyncio.sleep(1)
 
+        # Enter shutdown step
 
         print('shutting down http')
-        # shutting down
+        self._shutting_down = True
+        for coro in self._sleeping_connections:
+            coro.cancel()
+
+        # we should wait some time for connections to stop
+        previous_count = self._count
+        for i in range(self.shutdown_grace_period):
+            await asyncio.sleep(1)
+            if self._count == previous_count:
+                # no more connections
+                break
+            else:
+                previous_count = self._count
+
         self._server.close()
         await self._server.wait_closed()
 
     async def handle_incoming_request(self, reader, writer):
+        if self._shutting_down:
+            self._count += 1
         self._set_tcp_nodelay(writer)
         protocol = _HTTPServerProtocol(reader=reader, writer=writer,
                                        prefix=self.prefix)
         try:
             while True:
-                request = await protocol.get_request()
-                self._count += 1
-                print('in', self._count)
+                inner = asyncio.Task(protocol.get_request())
+                coro = asyncio.shield(inner)
+                self._sleeping_connections.add(coro)
+                try:
+                    request = await coro
+                except asyncio.CancelledError:
+                    # Give the request a chance to send a request if it has one
+                    if inner.done():
+                        request = inner.result()
+                    else:
+                        request = await asyncio.wait_for(inner, 1)
+                self._sleeping_connections.remove(coro)
                 response = await self._handler(request)
                 await protocol.send_response(response)
                 if protocol.conn.our_state is h11.MUST_CLOSE:
                     break
+                if self._shutting_down:
+                    break
                 protocol.conn.start_next_cycle()
-                self._count -= 1
-                print('out', self._count)
-        except (ClosedError, ConnectionResetError):
+        except (ClosedError, ConnectionResetError,
+                asyncio.CancelledError, asyncio.TimeoutError):
             pass
         finally:
             writer.close()
