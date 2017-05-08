@@ -7,8 +7,11 @@ import asyncio
 import socket
 
 import h11
-from httptools import HttpRequestParser, HttpResponseParser, HttpParserError, \
-    parse_url
+try:
+    from httptools import HttpRequestParser, HttpResponseParser, HttpParserError, \
+        parse_url
+except ImportError:
+    pass  # You need to have httptools installed to use this
 
 from ..webtypes import Request, Response
 from .transportabc import TransportABC, ClientTransportABC
