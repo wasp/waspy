@@ -94,8 +94,9 @@ class Application:
             t.listen(loop=loop)
 
         # Call on-startup hooks
-        for coro in self.on_start:
-            loop.run_until_complete(coro(self))
+        loop.run_until_complete(asyncio.gather(*[
+            coro(self) for coro in self.on_start
+        ]))
 
         # todo: fork/add processes?
         tasks = []
@@ -106,7 +107,7 @@ class Application:
         loop.add_signal_handler(signal.SIGTERM, self.start_shutdown)
         loop.add_signal_handler(signal.SIGINT, self.start_shutdown)
 
-        # Run all transports
+        # Run all transports - they shouldn't return until shutdown
         loop.run_until_complete(asyncio.gather(*tasks))
 
         # todo: Call on-shutdown hooks

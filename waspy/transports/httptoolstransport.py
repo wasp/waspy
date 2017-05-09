@@ -255,26 +255,23 @@ class _HTTPServerProtocol(asyncio.Protocol):
                          body={'reason': 'Something really bad happened'}))
 
     def send_response(self, response):
-        try:
-            content_length = len(response.data)
-        except TypeError:
-            content_length = 0
         headers = '''\
 HTTP/1.1 {status_code} {status_message}\r
 Connection: keep-alive\r
-Content-Length: {content_length}\r
 '''.format(status_code=response.status.value,
            status_message=response.status.phrase,
-           content_length=content_length,
            )
-        if response.body:
+        if response.data:
             headers += 'Content-Type: {}\r\n'.format(response.content_type)
+            if ('transfer-encoding' not in response.headers and
+                    'Transfer-Encoding' not in response.headers):
+                headers += 'Content-Length: {}\r\n'.format(len(response.data))
         for header, value in response.headers.items():
             headers += '{header}: {value}\r\n'.format(header=header,
                                                       value=value)
 
         result = headers.encode('ASCII') + b'\r\n'
-        if response.body:
+        if response.data:
             result += response.data
 
         self._transport.write(result)
