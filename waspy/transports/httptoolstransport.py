@@ -263,9 +263,13 @@ Connection: keep-alive\r
            )
         if response.data:
             headers += 'Content-Type: {}\r\n'.format(response.content_type)
-            if ('transfer-encoding' not in response.headers and
-                    'Transfer-Encoding' not in response.headers):
-                headers += 'Content-Length: {}\r\n'.format(len(response.data))
+            if ('transfer-encoding' in response.headers or
+                    'Transfer-Encoding' in response.headers):
+                print('Httptoolstransport currently doesnt support '
+                      'chunked mode, attempting without.')
+                response.headers.pop('transfer-encoding', None)
+                response.headers.pop('Transfer-Encoding', None)
+        headers += 'Content-Length: {}\r\n'.format(len(response.data))
         for header, value in response.headers.items():
             headers += '{header}: {value}\r\n'.format(header=header,
                                                       value=value)
