@@ -5,6 +5,7 @@ It currently still uses h11 for client transport
 
 import asyncio
 import socket
+import traceback
 
 import h11
 try:
@@ -106,7 +107,7 @@ class HTTPClientTransport(ClientTransportABC):
             if type(event) is h11.Data:
                 body += body
 
-        result.body = body
+        result._data = body.decode()
         connection.close()
         return result
 
@@ -250,6 +251,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
         try:
             self.send_response(future.result())
         except Exception:
+            traceback.print_exc()
             self.send_response(
                 Response(status=500,
                          body={'reason': 'Something really bad happened'}))
@@ -263,13 +265,15 @@ Connection: keep-alive\r
            )
         if response.data:
             headers += 'Content-Type: {}\r\n'.format(response.content_type)
+            headers += 'Content-Length: {}\r\n'.format(len(response.data))
             if ('transfer-encoding' in response.headers or
-                    'Transfer-Encoding' in response.headers):
+                        'Transfer-Encoding' in response.headers):
                 print('Httptoolstransport currently doesnt support '
                       'chunked mode, attempting without.')
                 response.headers.pop('transfer-encoding', None)
                 response.headers.pop('Transfer-Encoding', None)
-        headers += 'Content-Length: {}\r\n'.format(len(response.data))
+        else:
+            headers += 'Content-Length: {}\r\n'.format(0)
         for header, value in response.headers.items():
             headers += '{header}: {value}\r\n'.format(header=header,
                                                       value=value)

@@ -142,7 +142,8 @@ class Application:
         except Exception:
             exc_info = sys.exc_info()
             self.logger.log_exception(request, exc_info)
-            response = Response(status=500)
+            response = Response(status=500,
+                                body={'message': 'Server Error'})
         if not response.correlation_id:
             response.correlation_id = request.correlation_id
 

@@ -45,7 +45,7 @@ class Client:
         :return:
         """
         if not isinstance(method, Methods):
-            method = Methods(method)
+            method = Methods(method.upper())
         if content_type == 'application/json' and isinstance(body, dict):
             body = json.dumps(body)
         if isinstance(query_params, dict):
