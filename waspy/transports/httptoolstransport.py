@@ -148,6 +148,7 @@ class HTTPTransport(TransportABC):
         self._connections = set()
         self.shutdown_grace_period = shutdown_grace_period
         self.shutdown_wait_period = shutdown_wait_period
+        self.shutting_down = False
 
     def listen(self, *, loop: asyncio.AbstractEventLoop):
         self._loop = loop
@@ -190,6 +191,7 @@ class HTTPTransport(TransportABC):
         return response
 
     def shutdown(self):
+        self.shutting_down = True
         self._done_future.cancel()
 
 
@@ -274,12 +276,15 @@ class _HTTPServerProtocol(asyncio.Protocol):
                          body={'reason': 'Something really bad happened'}))
 
     def send_response(self, response):
-        headers = '''\
-HTTP/1.1 {status_code} {status_message}\r
-Connection: keep-alive\r
-'''.format(status_code=response.status.value,
-           status_message=response.status.phrase,
-           )
+        headers = 'HTTP/1.1 {status_code} {status_message}\r\n'.format(
+            status_code=response.status.value,
+            status_message=response.status.phrase,
+        )
+        if self._parent.shutting_down:
+            headers += 'Connection: close\r\n'
+        else:
+            headers += 'Connection: keep-alive\r\n'
+
         if response.data:
             headers += 'Content-Type: {}\r\n'.format(response.content_type)
             headers += 'Content-Length: {}\r\n'.format(len(response.data))
