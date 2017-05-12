@@ -157,19 +157,27 @@ class Response:
     @property
     def data(self):
         if self._data is None and self.body:
-            if self.content_type == 'application/json':
-                self._data = json.dumps(self.body).encode()
+            if (self.content_type == 'application/json' and
+                    isinstance(self.body, dict)):
+                self._data = json.dumps(self.body)
             else:
                 self._data = self.body
+            if isinstance(self._data, str):
+                self._data = self._data.encode()
         return self._data
 
     def json(self) -> dict:
         """
         Used for client response
         """
-        if not self._json:
+        if self.body is None:
+            self._json = {}
+        elif not self._json:
             # convert body into a json dict
-            self._json = json.loads(self.body.decode())
+            try:
+                self._json = json.loads(self.body.decode())
+            except json.JSONDecodeError as ex:
+                raise JSONDecodeError from ex
         return self._json
 
 

@@ -66,9 +66,13 @@ class HTTPClientTransport(ClientTransportABC):
                            content_type=None, port=80, **kwargs):
         # form request object
         path = path.replace('.', '/')
+        if not path.startswith('/'):
+            path = '/' + path
         if headers is None:
             headers = {}
         headers['Host'] = service
+        if port != 80:
+            headers['Host'] += ':{}'.format(port)
         headers['Connection'] = 'close'
         if correlation_id:
             headers['X-Correlation-Id'] = correlation_id
@@ -95,9 +99,11 @@ class HTTPClientTransport(ClientTransportABC):
         # form response object
 
         status_code = response.status_code
-        headers = response.headers
+        response_headers = response.headers
+        response_headers = {k.decode(): v.decode() for k,v in response_headers}
 
-        result = Response(headers=headers, correlation_id=correlation_id,
+        result = Response(headers=response_headers,
+                          correlation_id=correlation_id,
                           status=status_code)
 
         body = b''
@@ -118,7 +124,8 @@ class HTTPTransport(TransportABC):
     def get_client(self):
         return HTTPClientTransport()
 
-    def __init__(self, port=8080, prefix=None, shutdown_grace_period=5):
+    def __init__(self, port=8080, prefix=None, shutdown_grace_period=5,
+                 shutdown_wait_period=1):
         """
          HTTP Transport for listening on http
          :param port: The port to lisen on (0.0.0.0 will always be used)
@@ -127,6 +134,8 @@ class HTTPTransport(TransportABC):
          before connections get forceably closed. The only way for connections
          to not be forcibly closed is to have some connection draining in front
          of the service for deploys. Most docker schedulers will do this for you.
+         :param shutdown_wait_period: Time to wait after recieving the sigterm
+         before starting shutdown 
          """
         self.port = port
         if prefix is None:
@@ -138,6 +147,7 @@ class HTTPTransport(TransportABC):
         self._done_future = asyncio.Future()
         self._connections = set()
         self.shutdown_grace_period = shutdown_grace_period
+        self.shutdown_wait_period = shutdown_wait_period
 
     def listen(self, *, loop: asyncio.AbstractEventLoop):
         self._loop = loop
@@ -156,12 +166,19 @@ class HTTPTransport(TransportABC):
         except asyncio.CancelledError:
             pass
         print('shutting down http')
-
+        await asyncio.sleep(self.shutdown_wait_period)
         # wait for connections to stop
+        times_no_connections = 0
         for i in range(self.shutdown_grace_period):
-            for con in self._connections:
-                con.attempt_close()
             if not self._connections:
+                times_no_connections += 1
+            else:
+                times_no_connections = 0
+                for con in self._connections:
+                    con.attempt_close()
+
+            if times_no_connections > 3:
+                # three seconds with no connections
                 break
             await asyncio.sleep(1)
 
@@ -205,6 +222,8 @@ class _HTTPServerProtocol(asyncio.Protocol):
         try:
             self.http_parser.feed_data(data)
         except HttpParserError as e:
+            traceback.print_exc()
+            print(self.request.__dict__)
             self.send_response(Response(status=400,
                                         body={'reason': 'Invalid HTTP'}))
 
