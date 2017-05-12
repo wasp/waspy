@@ -4,8 +4,8 @@ It currently still uses h11 for client transport
 """
 
 import asyncio
-import socket
 import traceback
+import time
 
 import h11
 try:
@@ -165,7 +165,6 @@ class HTTPTransport(TransportABC):
             await self._done_future
         except asyncio.CancelledError:
             pass
-        print('shutting down http')
         await asyncio.sleep(self.shutdown_wait_period)
         # wait for connections to stop
         times_no_connections = 0
@@ -191,7 +190,6 @@ class HTTPTransport(TransportABC):
         return response
 
     def shutdown(self):
-        self._server.close()
         self._done_future.cancel()
 
 
