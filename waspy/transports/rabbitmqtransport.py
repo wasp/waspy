@@ -179,7 +179,6 @@ class RabbitMQTransport(TransportABC):
 
         self._counter += 1
         route = envelope.routing_key
-        print(route)
         headers = properties.headers or {}
         query = headers.pop('x-wasp-query-string', '').lstrip('?')
         headers['content-type'] = properties.content_type
