@@ -186,7 +186,7 @@ class RabbitMQTransport(TransportABC):
         correlation_id = properties.correlation_id
         message_id = properties.message_id
         reply_to = properties.reply_to
-        method = properties.type
+        method = properties.type or 'POST'
 
         request = Request(
             headers=headers,
