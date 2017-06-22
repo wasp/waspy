@@ -16,7 +16,7 @@ class CORSHandler:
             self.allowed_origins = allowed_origins.pop()
         else:
             self.allowed_origins = allowed_origins
-        self.allowed_headers = list(allowed_headers)
+        self.allowed_headers = allowed_headers
         self.allowed_methods = allowed_methods
 
     def add_cors_headers(self, request: Request, response: Response):
