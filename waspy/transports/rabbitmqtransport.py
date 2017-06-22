@@ -98,6 +98,7 @@ class RabbitMQTransport(TransportABC):
         self._counter = 0
         self._handler = None
         self._done_future = asyncio.Future()
+        self._closing = False
 
     def get_client(self):
         return RabbitMQClientTransport(self.channel)
@@ -146,6 +147,11 @@ class RabbitMQTransport(TransportABC):
         print('-- Listening for rabbitmq messages on queue {} --'
               .format(self.queue))
 
+    async def _handle_rabbit_error(self, exception):
+        print(exception)
+        if isinstance(exception, aioamqp.ChannelClosed) and not self._closing:
+            self.connect()
+
     async def connect(self, loop=None):
         self._transport, self._protocol = await aioamqp.connect(
             host=self.host,
@@ -155,11 +161,14 @@ class RabbitMQTransport(TransportABC):
             password=self.password,
             ssl=self.ssl,
             verify_ssl=self.verify_ssl,
+            heartbeat=20,
+            on_error=self._handle_rabbit_error,
             loop=loop
         )
         self.channel = await self._protocol.channel()
 
     async def close(self):
+        self._closing = True
         await self._protocol.close()
         self._transport.close()
 

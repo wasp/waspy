@@ -5,6 +5,8 @@ from typing import List, Union, Iterable
 from http import HTTPStatus
 from concurrent.futures import CancelledError
 
+from waspy._cors import CORSHandler
+from ._cors import CORSHandler
 from .client import Client
 from .webtypes import Request, Response, ResponseError
 from .router import Router
@@ -68,6 +70,7 @@ class Application:
         self.config = config
         self.raven = None
         self.logger = None
+        self._cors_handler = None
 
     @property
     def client(self) -> Client:
@@ -87,6 +90,12 @@ class Application:
         loop = asyncio.get_event_loop()
         # init logger
         self._create_logger()
+
+        # add cors support if needed
+        self._cors_handler = CORSHandler.from_config(self.config)
+        if self._cors_handler:
+            self.router.add_generic_options_handler(
+                self._cors_handler.options_handler)
 
         # wrap handlers in middleware
         loop.run_until_complete(self._wrap_handlers())
@@ -139,6 +148,7 @@ class Application:
             # This error can happen if a client closes the connection
             # The response shouldnt really ever be used
             return None
+
         except Exception:
             exc_info = sys.exc_info()
             self.logger.log_exception(request, exc_info)
@@ -146,6 +156,9 @@ class Application:
                                 body={'message': 'Server Error'})
         if not response.correlation_id:
             response.correlation_id = request.correlation_id
+
+        if self._cors_handler is not None:
+            self._cors_handler.add_cors_headers(request, response)
 
         # add default headers
         response.headers = {**self.default_headers, **response.headers}
