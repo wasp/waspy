@@ -1,4 +1,4 @@
-
+import sys
 import logging
 
 logger = logging.getLogger('waspy')
@@ -55,9 +55,12 @@ class SentryLogging(ErrorLoggingBase):
         return data, tags, extra_data
 
     def log_warning(self, request, message=None):
+        exc_info = sys.exc_info()
         super().log_warning(request, message=message)
         data, tags, extra = self._get_sentry_details(request, None)
-        self.raven.captureMessage(message, data=data, extra=extra, tags=tags)
+        self.raven.captureException(exc_info=exc_info, message=message,
+                                    data=data, extra=extra,
+                                    tags=tags, level='warning')
 
     def log_exception(self, request, exc_info, level='error'):
         super().log_exception(request, exc_info, level=level)
