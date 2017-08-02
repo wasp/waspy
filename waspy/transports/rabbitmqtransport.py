@@ -18,7 +18,9 @@ class RabbitMQClientTransport(ClientTransportABC):
     async def make_request(self, service: str, method: str, path: str,
                            body: bytes = None, query: str = None,
                            headers: dict = None, correlation_id: str = None,
-                           content_type: str = None, **kwargs):
+                           content_type: str = None,
+                           exchange: str = 'amq.topic',
+                           **kwargs):
 
         if not self._consumer_tag:
             await self.start()
@@ -48,9 +50,10 @@ class RabbitMQClientTransport(ClientTransportABC):
                                          properties=properties,
                                          payload=body)
 
-        future = asyncio.Future()
-        self._response_futures[message_id] = future
-        return await future
+        if method != 'publish':
+            future = asyncio.Future()
+            self._response_futures[message_id] = future
+            return await future
 
     async def start(self):
         await self.channel.queue_declare(queue_name=self.response_queue_name,

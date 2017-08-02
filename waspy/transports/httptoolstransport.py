@@ -225,7 +225,8 @@ class _HTTPServerProtocol(asyncio.Protocol):
             traceback.print_exc()
             print(self.request.__dict__)
             self.send_response(Response(status=400,
-                                        body={'reason': 'Invalid HTTP'}))
+                                        body={'reason': 'Invalid HTTP',
+                                              'details': str(e)}))
 
     """ 
     The following methods are for HTTP parsing (from httptools)
