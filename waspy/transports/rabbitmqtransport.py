@@ -40,19 +40,19 @@ class RabbitMQClientTransport(ClientTransportABC):
             'type': method,
             'app_id': 'test',
         }
-        if method != Methods.PUBLISH:
+        if method != 'PUBLISH':
             properties['reply_to'] = self.response_queue_name
             properties['expiration']: '30000'
 
         if content_type:
             properties['content_type'] = content_type
 
-        await self.channel.basic_publish(exchange_name='amq.topic',
+        await self.channel.basic_publish(exchange_name=exchange,
                                          routing_key=path,
                                          properties=properties,
                                          payload=body)
 
-        if method != Methods.PUBLISH:
+        if method != 'PUBLISH':
             future = asyncio.Future()
             self._response_futures[message_id] = future
             return await future
