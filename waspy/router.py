@@ -26,6 +26,7 @@ class Methods(Enum):
     OPTIONS = 'OPTIONS'
     PATCH = 'PATCH'
     HEAD = 'HEAD'
+    PUBLISH = 'PUBLISH'  # NOT VALID HTTP METHOD
 
 async def _send_404(request):
     raise webtypes.ResponseError(status=404)
