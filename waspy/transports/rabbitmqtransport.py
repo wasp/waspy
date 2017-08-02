@@ -5,7 +5,7 @@ import aioamqp
 from aioamqp.channel import Channel
 
 from .transportabc import TransportABC, ClientTransportABC
-from ..webtypes import Request, Response
+from ..webtypes import Request, Response, Methods
 
 
 class RabbitMQClientTransport(ClientTransportABC):
@@ -35,13 +35,15 @@ class RabbitMQClientTransport(ClientTransportABC):
         message_id = str(uuid.uuid4())
         properties = {
             'headers': headers,
-            'reply_to': self.response_queue_name,
             'correlation_id': correlation_id,
             'message_id': message_id,
-            'expiration': '30000',
             'type': method,
-            'app_id': 'hello',
+            'app_id': 'test',
         }
+        if method != Methods.PUBLISH:
+            properties['reply_to'] = self.response_queue_name
+            properties['expiration']: '30000'
+
         if content_type:
             properties['content_type'] = content_type
 
@@ -50,7 +52,7 @@ class RabbitMQClientTransport(ClientTransportABC):
                                          properties=properties,
                                          payload=body)
 
-        if method != 'publish':
+        if method != Methods.PUBLISH:
             future = asyncio.Future()
             self._response_futures[message_id] = future
             return await future
