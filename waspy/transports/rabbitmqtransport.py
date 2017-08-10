@@ -85,7 +85,7 @@ class RabbitMQClientTransport(ClientTransportABC):
 class RabbitMQTransport(TransportABC):
     def __init__(self, *, url, port=5672, queue='', virtualhost='/',
                  username='guest', password='guest',
-                 ssl=False, verify_ssl=True):
+                 ssl=False, verify_ssl=True, create_queue=True):
         self.host = url
         self.port = port
         self.virtualhost = virtualhost
@@ -94,6 +94,7 @@ class RabbitMQTransport(TransportABC):
         self.password = password
         self.ssl = ssl
         self.verify_ssl = verify_ssl
+        self.create_queue = create_queue
         self._transport = None
         self._protocol = None
         self.channel = None
@@ -145,7 +146,8 @@ class RabbitMQTransport(TransportABC):
         async def setup():
 
             await self.connect(loop=loop)
-            await self.channel.queue_declare(queue_name=self.queue)
+            if self.create_queue:
+                await self.channel.queue_declare(queue_name=self.queue)
             await self.channel.basic_qos(prefetch_count=1, prefetch_size=0)
 
         loop.run_until_complete(setup())
