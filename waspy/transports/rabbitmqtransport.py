@@ -14,6 +14,8 @@ class RabbitMQClientTransport(ClientTransportABC):
         self._response_futures = {}
         self.response_queue_name = str(uuid.uuid1()).encode()
         self._consumer_tag = None
+        self._starting_future = asyncio.ensure_future(self.start())
+
 
     async def make_request(self, service: str, method: str, path: str,
                            body: bytes = None, query: str = None,
@@ -22,8 +24,8 @@ class RabbitMQClientTransport(ClientTransportABC):
                            exchange: str = 'amq.topic',
                            **kwargs):
 
-        if not self._consumer_tag:
-            await self.start()
+        if not self._starting_future.done:
+            await self._starting_future
         path = path.replace('/', '.').lstrip('.')
         if headers is None:
             headers = {}
