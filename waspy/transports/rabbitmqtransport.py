@@ -218,25 +218,25 @@ class RabbitMQTransport(TransportABC):
         )
 
         response = await self._handler(request)
-        if not reply_to:
-            # nowhere to reply. No point it trying to send a response
-            return
+        if reply_to:
+            response.headers['Status'] = str(response.status.value)
 
-        response.headers['Status'] = str(response.status.value)
+            payload = response.data or b'None'
 
-        payload = response.data or b'None'
+            properties = {
+                'correlation_id': response.correlation_id,
+                'headers': response.headers,
+                'content_type': response.content_type,
+                'message_id': message_id,
+                'expiration': '30000',
+            }
+            await channel.basic_publish(exchange_name='',
+                                        payload=payload,
+                                        routing_key=reply_to,
+                                        properties=properties)
 
-        properties = {
-            'correlation_id': response.correlation_id,
-            'headers': response.headers,
-            'content_type': response.content_type,
-            'message_id': message_id,
-            'expiration': '30000',
-        }
-        await channel.basic_publish(exchange_name='',
-                                    payload=payload,
-                                    routing_key=reply_to,
-                                    properties=properties)
+        if self._use_acks:
+            await self.channel.basic_client_ack(delivery_tag=envelope.delivery_tag)
         self._counter -= 1
 
     def shutdown(self):
