@@ -87,7 +87,8 @@ class RabbitMQClientTransport(ClientTransportABC):
 class RabbitMQTransport(TransportABC):
     def __init__(self, *, url, port=5672, queue='', virtualhost='/',
                  username='guest', password='guest',
-                 ssl=False, verify_ssl=True, create_queue=True):
+                 ssl=False, verify_ssl=True, create_queue=True,
+                 use_acks=False):
         self.host = url
         self.port = port
         self.virtualhost = virtualhost
@@ -97,6 +98,7 @@ class RabbitMQTransport(TransportABC):
         self.ssl = ssl
         self.verify_ssl = verify_ssl
         self.create_queue = create_queue
+        self._use_acks=use_acks
         self._transport = None
         self._protocol = None
         self.channel = None
@@ -130,7 +132,7 @@ class RabbitMQTransport(TransportABC):
         self._consumer_tag = (await self.channel.basic_consume(
             self.handle_request,
             queue_name=self.queue,
-            no_ack=True)).get('consumer_tag')
+            no_ack=not self._use_acks)).get('consumer_tag')
 
         try:
             await self._done_future

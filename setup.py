@@ -8,7 +8,7 @@ except(IOError, ImportError):
 
 setup(
     name='waspy',
-    version='0.16.3',
+    version='0.16.5',
     install_requires=[
         'h11==0.7.0',
         'aioamqp==0.8.2',
