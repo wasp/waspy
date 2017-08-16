@@ -126,9 +126,10 @@ class RabbitMQTransport(TransportABC):
 
     async def start(self, handler):
         self._handler = handler
-        # Need to reconnect because of potential forking affects
-        await self.close()
-        await self.connect()
+        # ToDo: Need to reconnect because of potential forking affects
+        # await self.close()
+        # await self.connect()
+        await self.channel.basic_qos(prefetch_count=1)
         self._consumer_tag = (await self.channel.basic_consume(
             self.handle_request,
             queue_name=self.queue,
@@ -152,7 +153,7 @@ class RabbitMQTransport(TransportABC):
             await self.connect(loop=loop)
             if self.create_queue:
                 await self.channel.queue_declare(queue_name=self.queue)
-            await self.channel.basic_qos(prefetch_count=1, prefetch_size=0)
+            await self.channel.basic_qos(prefetch_count=1)
 
         loop.run_until_complete(setup())
         print('-- Listening for rabbitmq messages on queue {} --'
