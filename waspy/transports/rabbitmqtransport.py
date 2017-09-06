@@ -162,7 +162,7 @@ class RabbitMQTransport(TransportABC):
     async def _handle_rabbit_error(self, exception):
         print(exception)
         if isinstance(exception, aioamqp.ChannelClosed) and not self._closing:
-            self.connect()
+            await self.connect()
 
     async def connect(self, loop=None):
         self._transport, self._protocol = await aioamqp.connect(
