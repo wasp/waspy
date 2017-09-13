@@ -24,9 +24,13 @@ class RabbitChannelMixIn:
         if self.channel and self.channel.is_open:
             return
 
-        try:  # getting a new channel from existing protocol
-            channel = await self._protocol.channel()
-        except aioamqp.AioamqpException:  # ok, that didnt work
+        if self._protocol:
+            try:  # getting a new channel from existing protocol
+                channel = await self._protocol.channel()
+            except aioamqp.AioamqpException:
+                # ok, that didnt work
+                channel = None
+        if not channel:
             self._transport, self._protocol = await aioamqp.connect(
                 host=self.host,
                 port=self.port,
@@ -67,7 +71,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         if not url:
             raise TypeError("RabbitMqClientTransport() missing 1 required keyword-only argument: 'url'")
 
-        self._starting_future : asyncio.Future = asyncio.ensure_future(self.connect())
+        self._starting_future: asyncio.Future = asyncio.ensure_future(self.connect())
 
 
     async def make_request(self, service: str, method: str, path: str,
