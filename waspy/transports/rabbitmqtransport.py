@@ -8,13 +8,66 @@ from .transportabc import TransportABC, ClientTransportABC
 from ..webtypes import Request, Response, Methods
 
 
-class RabbitMQClientTransport(ClientTransportABC):
-    def __init__(self, channel):
-        self.channel = channel
+class RabbitChannelMixIn:
+    async def _bootstrap_channel(self, channel):
+        raise NotImplementedError
+
+    async def _handle_rabbit_error(self, exception):
+        print(exception)
+        if isinstance(exception, aioamqp.ChannelClosed):
+            if not self._closing:
+                self._starting_future = asyncio.ensure_future(self.connect())
+        else:
+            raise exception
+
+    async def connect(self, loop=None):
+        if self.channel and self.channel.is_open:
+            return
+
+        try:  # getting a new channel from existing protocol
+            channel = await self._protocol.channel()
+        except aioamqp.AioamqpException:  # ok, that didnt work
+            self._transport, self._protocol = await aioamqp.connect(
+                host=self.host,
+                port=self.port,
+                virtualhost=self.virtualhost,
+                login=self.username,
+                password=self.password,
+                ssl=self.ssl,
+                verify_ssl=self.verify_ssl,
+                heartbeat=20,
+                on_error=self._handle_rabbit_error,
+                loop=loop
+            )
+            channel = await self._protocol.channel()
+        await self._bootstrap_channel(channel)
+
+
+class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
+    def __init__(self, *, url=None, port=5672, virtualhost='/',
+                 username='guest', password='guest',
+                 ssl=False, verify_ssl=True):
+
+        self._transport = None
+        self._protocol = None
         self._response_futures = {}
+        self.host = url
+        self.port = port
+        self.virtualhost = virtualhost
+        self.username = username
+        self.password = password
+        self.ssl = ssl
+        self.verify_ssl = verify_ssl
+
         self.response_queue_name = str(uuid.uuid1()).encode()
         self._consumer_tag = None
-        self._starting_future = asyncio.ensure_future(self.start())
+        self._closing = False
+        self.channel = None
+
+        if not url:
+            raise TypeError("RabbitMqClientTransport() missing 1 required keyword-only argument: 'url'")
+
+        self._starting_future = asyncio.ensure_future(self.connect())
 
 
     async def make_request(self, service: str, method: str, path: str,
@@ -59,7 +112,7 @@ class RabbitMQClientTransport(ClientTransportABC):
             self._response_futures[message_id] = future
             return await future
 
-    async def start(self):
+    async def _bootstrap_channel(self, channel):
         await self.channel.queue_declare(queue_name=self.response_queue_name,
                                          durable=False,
                                          exclusive=True,
@@ -83,8 +136,13 @@ class RabbitMQClientTransport(ClientTransportABC):
 
         future.set_result(response)
 
+    async def close(self):
+        self._closing = True
+        await self._protocol.close()
+        self._transport.close()
 
-class RabbitMQTransport(TransportABC):
+
+class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
     def __init__(self, *, url, port=5672, queue='', virtualhost='/',
                  username='guest', password='guest',
                  ssl=False, verify_ssl=True, create_queue=True,
@@ -109,9 +167,23 @@ class RabbitMQTransport(TransportABC):
         self._handler = None
         self._done_future = asyncio.Future()
         self._closing = False
+        self._client = None
+        self._starting_future = None
 
     def get_client(self):
-        return RabbitMQClientTransport(self.channel)
+        if not self._client:
+            # TODO: not ideal, the client/server should ideally share a channel
+            #   or at least a connection
+            self._client = RabbitMQClientTransport(
+                url=self.host,
+                port=self.port,
+            virtualhost=self.virtualhost,
+            username=self.username,
+            password=self.password,
+            ssl=self.ssl,
+            verify_ssl=self.verify_ssl)
+
+        return self._client
 
     async def declare_exchange(self):
         pass
@@ -129,11 +201,8 @@ class RabbitMQTransport(TransportABC):
         # ToDo: Need to reconnect because of potential forking affects
         # await self.close()
         # await self.connect()
-        await self.channel.basic_qos(prefetch_count=1)
-        self._consumer_tag = (await self.channel.basic_consume(
-            self.handle_request,
-            queue_name=self.queue,
-            no_ack=not self._use_acks)).get('consumer_tag')
+        if not self._starting_future.done:
+            await self._starting_future
 
         try:
             await self._done_future
@@ -148,40 +217,23 @@ class RabbitMQTransport(TransportABC):
             await asyncio.sleep(1)
 
     def listen(self, *, loop):
-        async def setup():
+        self._starting_future = loop.create_future(self.connect(loop=loop))
 
-            await self.connect(loop=loop)
+        async def setup():
+            if not self._starting_future.done:
+                await self._starting_future
             if self.create_queue:
                 await self.channel.queue_declare(queue_name=self.queue)
-            await self.channel.basic_qos(prefetch_count=1)
 
         loop.run_until_complete(setup())
         print('-- Listening for rabbitmq messages on queue {} --'
               .format(self.queue))
 
-    async def _handle_rabbit_error(self, exception):
-        print(exception)
-        if isinstance(exception, aioamqp.ChannelClosed) and not self._closing:
-            await self.connect()
-
-    async def connect(self, loop=None):
-        self._transport, self._protocol = await aioamqp.connect(
-            host=self.host,
-            port=self.port,
-            virtualhost=self.virtualhost,
-            login=self.username,
-            password=self.password,
-            ssl=self.ssl,
-            verify_ssl=self.verify_ssl,
-            heartbeat=20,
-            on_error=self._handle_rabbit_error,
-            loop=loop
-        )
-        self.channel = await self._protocol.channel()
-
     async def close(self):
         self._closing = True
         await self._protocol.close()
+        if self._client:
+            await self._client.close()
         self._transport.close()
 
     async def handle_request(self, channel: Channel, body, envelope,
@@ -231,6 +283,8 @@ class RabbitMQTransport(TransportABC):
                 'message_id': message_id,
                 'expiration': '30000',
             }
+            if not self._starting_future.done:
+                await self._starting_future
             await channel.basic_publish(exchange_name='',
                                         payload=payload,
                                         routing_key=reply_to,
@@ -244,5 +298,11 @@ class RabbitMQTransport(TransportABC):
         print('Rabbit got shutdown signal')
         self._done_future.cancel()
 
+    async def _bootstrap_channel(self, channel):
+        await self.channel.basic_qos(prefetch_count=1)
+        self._consumer_tag = (await self.channel.basic_consume(
+            self.handle_request,
+            queue_name=self.queue,
+            no_ack=not self._use_acks)).get('consumer_tag')
 
 
