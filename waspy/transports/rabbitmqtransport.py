@@ -113,6 +113,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             return await future
 
     async def _bootstrap_channel(self, channel):
+        self.channel = channel
         await self.channel.queue_declare(queue_name=self.response_queue_name,
                                          durable=False,
                                          exclusive=True,
@@ -299,6 +300,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         self._done_future.cancel()
 
     async def _bootstrap_channel(self, channel):
+        self.channel = channel
         await self.channel.basic_qos(prefetch_count=1)
         self._consumer_tag = (await self.channel.basic_consume(
             self.handle_request,
