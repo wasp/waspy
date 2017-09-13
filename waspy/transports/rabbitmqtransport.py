@@ -67,7 +67,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         if not url:
             raise TypeError("RabbitMqClientTransport() missing 1 required keyword-only argument: 'url'")
 
-        self._starting_future = asyncio.ensure_future(self.connect())
+        self._starting_future : asyncio.Future = asyncio.ensure_future(self.connect())
 
 
     async def make_request(self, service: str, method: str, path: str,
@@ -79,6 +79,8 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
 
         if not self._starting_future.done:
             await self._starting_future
+        if self._starting_future.exception():
+            raise self._starting_future.exception()
         path = path.replace('/', '.').lstrip('.')
         if headers is None:
             headers = {}
@@ -178,11 +180,11 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
             self._client = RabbitMQClientTransport(
                 url=self.host,
                 port=self.port,
-            virtualhost=self.virtualhost,
-            username=self.username,
-            password=self.password,
-            ssl=self.ssl,
-            verify_ssl=self.verify_ssl)
+                virtualhost=self.virtualhost,
+                username=self.username,
+                password=self.password,
+                ssl=self.ssl,
+                verify_ssl=self.verify_ssl)
 
         return self._client
 
@@ -223,6 +225,8 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         async def setup():
             if not self._starting_future.done:
                 await self._starting_future
+            if self._starting_future.exception():
+                raise self._starting_future.exception()
             if self.create_queue:
                 await self.channel.queue_declare(queue_name=self.queue)
 
@@ -286,6 +290,8 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
             }
             if not self._starting_future.done:
                 await self._starting_future
+            if self._starting_future.exception():
+                raise self._starting_future.exception()
             await channel.basic_publish(exchange_name='',
                                         payload=payload,
                                         routing_key=reply_to,
