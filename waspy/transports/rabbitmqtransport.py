@@ -23,7 +23,7 @@ class RabbitChannelMixIn:
     async def connect(self, loop=None):
         if self.channel and self.channel.is_open:
             return
-
+        channel = None
         if self._protocol:
             try:  # getting a new channel from existing protocol
                 channel = await self._protocol.channel()
