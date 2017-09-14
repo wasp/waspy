@@ -13,6 +13,7 @@ class ClientTransportABC(ABC):
                            body: bytes=None, query: str=None,
                            headers: dict=None, correlation_id: str=None,
                            content_type: str=None,
+                           timeout:int = 30,
                            **kwargs) -> webtypes.Response:
         """
         Method for actually making a request
@@ -25,6 +26,8 @@ class ClientTransportABC(ABC):
         :param headers: Dictionary of headers
         :param correlation_id:
         :param content_type: example: `application/json`
+        :param timeout: time to wait for response in seconds before getting
+            an asyncio.TimeoutError
         :param kwargs: Should except **kwargs for compatability for
             other possible options on other transports
             (for example, http might need a `port` option)

@@ -40,6 +40,8 @@ class Client:
         :param content_type:
         :param context: A request object from which a "child-request"
             will be made
+        :param timeout: Time in seconds the client will wait befor raising
+            an asyncio.TimeoutError
         :param kwargs: Just a place holder so transport specific options
             can be passed through
         :return:

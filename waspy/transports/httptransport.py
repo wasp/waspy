@@ -58,7 +58,8 @@ class HTTPClientTransport(ClientTransportABC):
 
     async def make_request(self, service, method, path, body=None, query=None,
                            headers=None, correlation_id=None,
-                           content_type=None, port=80, **kwargs):
+                           content_type=None, port=80,
+                           timeout=30, **kwargs):
         # form request object
         path = path.replace('.', '/')
         if headers is None:
@@ -86,7 +87,7 @@ class HTTPClientTransport(ClientTransportABC):
 
         connection.send(h11.EndOfMessage())
 
-        response = await connection.next_event()
+        response = await asyncio.wait_for(connection.next_event(), timeout)
         assert type(response) is h11.Response
 
         # form response object

@@ -79,9 +79,10 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
                            headers: dict = None, correlation_id: str = None,
                            content_type: str = None,
                            exchange: str = 'amq.topic',
+                           timeout=30,
                            **kwargs):
 
-        if not self._starting_future.done:
+        if not self._starting_future.done():
             await self._starting_future
         if self._starting_future.exception():
             raise self._starting_future.exception()
@@ -116,7 +117,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         if method != 'PUBLISH':
             future = asyncio.Future()
             self._response_futures[message_id] = future
-            return await future
+            return await asyncio.wait_for(future, timeout)
 
     async def _bootstrap_channel(self, channel):
         self.channel = channel
@@ -208,7 +209,9 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         # ToDo: Need to reconnect because of potential forking affects
         # await self.close()
         # await self.connect()
-        if not self._starting_future.done:
+        self._starting_future = asyncio.ensure_future(
+            self._bootstrap_channel(self.channel))
+        if not self._starting_future.done():
             await self._starting_future
 
         try:
@@ -224,10 +227,10 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
             await asyncio.sleep(1)
 
     def listen(self, *, loop):
-        self._starting_future = loop.create_future(self.connect(loop=loop))
+        self._starting_future = loop.create_task(self.connect(loop=loop))
 
         async def setup():
-            if not self._starting_future.done:
+            if not self._starting_future.done():
                 await self._starting_future
             if self._starting_future.exception():
                 raise self._starting_future.exception()
@@ -311,6 +314,10 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
 
     async def _bootstrap_channel(self, channel):
         self.channel = channel
+        if self._handler is None:
+            # we havent started yet
+            return
+
         await self.channel.basic_qos(prefetch_count=1)
         self._consumer_tag = (await self.channel.basic_consume(
             self.handle_request,
