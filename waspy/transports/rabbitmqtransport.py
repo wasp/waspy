@@ -14,17 +14,17 @@ class RabbitChannelMixIn:
 
     async def _handle_rabbit_error(self, exception):
         print(exception)
-        if isinstance(exception, aioamqp.ChannelClosed):
+        try:
+            raise exception
+        except (aioamqp.ChannelClosed, aioamqp.AmqpClosedConnection):
             if not self._closing:
                 self._starting_future = asyncio.ensure_future(self.connect())
-        else:
-            raise exception
 
     async def connect(self, loop=None):
         if self.channel and self.channel.is_open:
             return
         channel = None
-        if self._protocol:
+        if self._protocol and not self._protocol.connection_closed.is_set():
             try:  # getting a new channel from existing protocol
                 channel = await self._protocol.channel()
             except aioamqp.AioamqpException:
