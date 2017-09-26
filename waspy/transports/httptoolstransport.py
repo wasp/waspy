@@ -237,6 +237,9 @@ class _HTTPServerProtocol(asyncio.Protocol):
 
     def on_header(self, name, value):
         key = name.decode('ASCII').lower()
+        if not value:
+            value = b''
+
         val = value.decode()
         self.request.headers[key] = val
         if key == 'x-correlation-id':
