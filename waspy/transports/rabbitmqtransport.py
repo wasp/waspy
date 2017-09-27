@@ -123,7 +123,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         self.channel = channel
         await self.channel.queue_declare(queue_name=self.response_queue_name,
                                          durable=False,
-                                         exclusive=True,
+                                         exclusive=False,
                                          auto_delete=True)
         self._consumer_tag = (await self.channel.basic_consume(
             self.handle_responses,
