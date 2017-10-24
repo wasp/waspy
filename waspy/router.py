@@ -81,6 +81,7 @@ class Router:
 
         d = self._routes
         params = []
+        raw_path_string = '/'
         try:
             for portion in route.split('.'):
                 sub = d.get(portion, None)
@@ -93,6 +94,9 @@ class Router:
 
                     sub = d[key]
                     params.append(param)
+                    raw_path_string += '*/'
+                else:
+                    raw_path_string += portion + '/'
                 d = sub
             wrapped, handler, keys = d[method]
         except KeyError:
@@ -103,6 +107,7 @@ class Router:
         for key, param in zip(keys, params):
             request.path_params[key] = param
         request._handler = handler
+        request._raw_path = raw_path_string
         return wrapped
 
     def add_static_route(self, method: str, route: str, handler: callable,

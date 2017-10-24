@@ -217,13 +217,14 @@ class _HTTPServerProtocol(asyncio.Protocol):
 
     def connection_lost(self, exc):
         self._parent._connections.discard(self)
+        self._transport = None
 
     def data_received(self, data):
         try:
             self.http_parser.feed_data(data)
         except HttpParserError as e:
             traceback.print_exc()
-            print(self.request.__dict__)
+            print(self.request.__dict__)  # todo: should use logging
             self.send_response(Response(status=400,
                                         body={'reason': 'Invalid HTTP',
                                               'details': str(e)}))
