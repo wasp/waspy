@@ -12,7 +12,7 @@ http to using a message bus, or vice-versa. You could even listen on both
 at the same time without having to modify your code at all.
 
 ## Example
-Look at `examples/` folder for some quick examples
+Look at `examples/` folder for some quick examples, or there is an entire example repo at https://github.com/wasp/waspy-example
 
 ## Alpha
 This project is currently in alpha state. 
