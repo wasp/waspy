@@ -1,11 +1,11 @@
-import sys
 import asyncio
+import logging
 import signal
+import sys
 from typing import List, Union, Iterable
 from http import HTTPStatus
 from concurrent.futures import CancelledError
 
-from waspy._cors import CORSHandler
 from ._cors import CORSHandler
 from .client import Client
 from .webtypes import Request, Response, ResponseError
@@ -13,6 +13,10 @@ from .router import Router
 from .transports.transportabc import TransportABC
 from .configuration import Config, ConfigError
 from . import errorlogging
+
+
+logging.basicConfig(format='%(asctime)s %(levelname)s [%(module)s.%(funcName)s] %(message)s')
+logger = logging.getLogger('waspy')
 
 
 async def response_wrapper_factory(app, handler):
@@ -85,7 +89,8 @@ class Application:
             t.shutdown()
 
     def run(self):
-        # first, lets make the signals kill us
+        if self.config['debug']:
+            logger.setLevel('DEBUG')
 
         loop = asyncio.get_event_loop()
         # init logger
@@ -100,7 +105,7 @@ class Application:
         # wrap handlers in middleware
         loop.run_until_complete(self._wrap_handlers())
         for t in self.transport:
-            t.listen(loop=loop)
+            t.listen(loop=loop, config=self.config)
 
         # Call on-startup hooks
         loop.run_until_complete(asyncio.gather(*[

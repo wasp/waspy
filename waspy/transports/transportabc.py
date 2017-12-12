@@ -38,7 +38,7 @@ class ClientTransportABC(ABC):
 class TransportABC(ABC):
     """ Abstract Base Class for implementing server transports"""
     @abstractmethod
-    def listen(self, *, loop):
+    def listen(self, *, loop, config):
         """This method is responsible for establishing a listening connection
         For example, in HTTP world this would mean acquiring a specific port,
         in a RabbitMQ world this would mean getting a connection and attaching

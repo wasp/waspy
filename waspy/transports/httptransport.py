@@ -138,7 +138,7 @@ class HTTPTransport(TransportABC):
         self._shutting_down = False
         self._sleeping_connections = set()
 
-    def listen(self, *, loop: asyncio.AbstractEventLoop):
+    def listen(self, *, loop: asyncio.AbstractEventLoop, config):
         coro = asyncio.start_server(
             self.handle_incoming_request, '0.0.0.0', self.port, loop=loop)
         self._server = loop.run_until_complete(coro)

@@ -90,6 +90,12 @@ class Request:
         self._method = value
 
     @property
+    def path_qs(self):
+        # the path + the query string
+        query = '?' + self.query_string if self.query_string else ''
+        return self.path + query
+
+    @property
     def cookies(self) -> dict:
         if self._cookies is None:
             self._cookies = {}
@@ -120,6 +126,12 @@ class Request:
         return('<Request({method} {path}{query})@{id}>'
                .format(method=self.method, path=self.path,
                        query=query, id=id(self)))
+
+    def __repr__(self):
+        return (f'Request(headers={repr(self.headers)}, path={repr(self.path)}, '
+                f'correlation_id={self.correlation_id}, method={repr(self.method)}, '
+                f'query_string={self.query_string}, body={self.body}, '
+                f'content_type={self.content_type})')
 
 class Response:
     def __init__(self, headers=None, correlation_id=None,

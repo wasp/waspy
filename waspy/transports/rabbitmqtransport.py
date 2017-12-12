@@ -226,7 +226,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         while self._counter > 0:
             await asyncio.sleep(1)
 
-    def listen(self, *, loop):
+    def listen(self, *, loop, config):
         self._starting_future = loop.create_task(self.connect(loop=loop))
 
         async def setup():

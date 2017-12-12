@@ -19,7 +19,7 @@ class TestTransport(TransportABC):
         self.loop = None
         self.handler = None
 
-    def listen(self, *, loop):
+    def listen(self, *, loop, config):
         self.loop = loop
 
     def run_app(self, app):

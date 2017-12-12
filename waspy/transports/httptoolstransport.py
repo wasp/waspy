@@ -6,6 +6,7 @@ It currently still uses h11 for client transport
 import asyncio
 import traceback
 import time
+import logging
 
 import h11
 try:
@@ -16,6 +17,8 @@ except ImportError:
 
 from ..webtypes import Request, Response
 from .transportabc import TransportABC, ClientTransportABC
+
+logger = logging.getLogger('waspy')
 
 
 class ClosedError(Exception):
@@ -150,8 +153,13 @@ class HTTPTransport(TransportABC):
         self.shutdown_wait_period = shutdown_wait_period
         self.shutting_down = False
 
-    def listen(self, *, loop: asyncio.AbstractEventLoop):
+    def listen(self, *, loop: asyncio.AbstractEventLoop, config):
         self._loop = loop
+        self._config = config
+        if self._config['debug']:
+            self.shutdown_grace_period = 0
+            self.shutdown_wait_period = 0
+            self._debug = True
 
     async def start(self, request_handler):
         self._handler = request_handler
@@ -169,7 +177,7 @@ class HTTPTransport(TransportABC):
         await asyncio.sleep(self.shutdown_wait_period)
         # wait for connections to stop
         times_no_connections = 0
-        for i in range(self.shutdown_grace_period):
+        for _ in range(self.shutdown_grace_period):
             if not self._connections:
                 times_no_connections += 1
             else:
@@ -187,6 +195,7 @@ class HTTPTransport(TransportABC):
         await self._server.wait_closed()
 
     async def handle_incoming_request(self, request):
+        logger.debug('received incoming request via http: %s', request)
         response = await self._handler(request)
         return response
 
@@ -224,10 +233,11 @@ class _HTTPServerProtocol(asyncio.Protocol):
             self.http_parser.feed_data(data)
         except HttpParserError as e:
             traceback.print_exc()
-            print(self.request.__dict__)  # todo: should use logging
-            self.send_response(Response(status=400,
-                                        body={'reason': 'Invalid HTTP',
-                                              'details': str(e)}))
+            logger.error('Bad http: %s', self.request)
+            if self._transport:
+                self.send_response(Response(status=400,
+                                            body={'reason': 'Invalid HTTP',
+                                                  'details': str(e)}))
 
     """ 
     The following methods are for HTTP parsing (from httptools)
@@ -289,6 +299,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
             headers += 'Connection: close\r\n'
         else:
             headers += 'Connection: keep-alive\r\n'
+            headers += 'Keep-Alive: timeout=5, max=50\r\n'
 
         if response.data:
             headers += 'Content-Type: {}\r\n'.format(response.content_type)
