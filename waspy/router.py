@@ -116,7 +116,7 @@ class Router:
         request._raw_path = raw_path_string
         return wrapped
 
-    def add_static_route(self, method: str, route: str, handler: Callable,
+    def add_static_route(self, method: Union[str, Methods], route: str, handler: Callable,
                          skip_middleware=False):
         """
         Adds a static route. A static route is a special route that
@@ -127,7 +127,7 @@ class Router:
 
         All static routes SKIP middlewares
         """
-        if not isinstance(method, Methods):
+        if isinstance(method, str):
             method = Methods(method.upper())
         route = route.lstrip('/').replace('/', '.')
         if route not in self._static_routes:
