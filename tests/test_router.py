@@ -6,28 +6,28 @@ from waspy.router import Router, Methods
 @pytest.fixture
 def router():
     router_ = Router()
-    router_.add_get('/single', 1)
-    router_.add_get('/double/double', 2)
-    router_.add_get('/something/static/and/long', 3)
-    router_.add_get('/single/{id}', 4)
-    router_.add_get('/foo/{fooid}/bar/{barid}', 5)
-    router_.add_get('/foo/{fooid}/bar', 6)
-    router_.add_get('/foo/bar/baz/{id}', 7)
-    router_.add_get('/multiple/{ids}/{in}/{a}/row', 8)
-    router_.add_get('/foo/{fooid}:action', 9)
-    router_.add_get('/foo/{fooid}:action2', 10)
+    router_.get('/single', 1)
+    router_.get('/double/double', 2)
+    router_.get('/something/static/and/long', 3)
+    router_.get('/single/{id}', 4)
+    router_.get('/foo/{fooid}/bar/{barid}', 5)
+    router_.get('/foo/{fooid}/bar', 6)
+    router_.get('/foo/bar/baz/{id}', 7)
+    router_.get('/multiple/{ids}/{in}/{a}/row', 8)
+    router_.get('/foo/{fooid}:action', 9)
+    router_.get('/foo/{fooid}:action2', 10)
 
     with router_.prefix('/test'):
-        router_.add_get('/test', 11)
+        router_.get('/test', 11)
 
     with router_.prefix('/nest-1'):
         with router_.prefix('/nest-2'):
             with router_.prefix('/nest-3/{nest3id}'):
                 with router_.prefix('/nest-4'):
-                    router_.add_get('/nest-4-get', 4)
+                    router_.get('/nest-4-get', 4)
                     with router_.prefix('/nest-5'):
-                        router_.add_get('/nest-5-get', 5)
-                    router_.add_get('/nest-4-get-2', 42)
+                        router_.get('/nest-5-get', 5)
+                    router_.get('/nest-4-get-2', 42)
 
     # now wrap all handlers with nothing
     handler_gen = router_._get_and_wrap_routes()
