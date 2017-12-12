@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from enum import Enum
 
 from waspy import webtypes
@@ -50,6 +52,7 @@ class Router:
         self.options_handler = None
 
         self.handle_404 = _send_404  # the 404 route will skip middlewares
+        self._prefix = ''
 
     def _get_and_wrap_routes(self, _d=None):
         if _d is None:
@@ -132,6 +135,7 @@ class Router:
         if not isinstance(method, Methods):
             method = Methods(method.upper())
 
+        route = self._prefix + route
         route = route.replace('/', '.').lstrip('.')
         d = self._routes
         params = []
@@ -181,3 +185,12 @@ class Router:
         Add a handler for all options requests. This WILL bypass middlewares
         """
         self.options_handler = handler
+
+    @contextmanager
+    def prefix(self, prefix):
+        original_prefix = self._prefix
+        self._prefix += prefix
+        yield self
+        self._prefix = original_prefix
+
+
