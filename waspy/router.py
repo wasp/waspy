@@ -129,6 +129,7 @@ class Router:
         """
         if isinstance(method, str):
             method = Methods(method.upper())
+        route = self._prefix + route
         route = route.lstrip('/').replace('/', '.')
         if route not in self._static_routes:
             self._static_routes[route] = {}
