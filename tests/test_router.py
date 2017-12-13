@@ -72,3 +72,12 @@ def test_get_handler(path, expected_handler, expected_params, router):
         assert key in request.path_params
         assert request.path_params[key] == '_' + key
 
+
+def test_duplicate_handler():
+    router_ = Router()
+    router_.get('/test/path', 5)
+
+    with pytest.raises(ValueError):
+        router_.get('/test/path', 6)
+
+    router_.get('/test/path/{param}', 5)

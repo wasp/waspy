@@ -160,7 +160,8 @@ class Router:
             if key not in d:
                 d[key] = {}
             d = d[key]
-
+        if method in d:
+            raise ValueError(f"Duplicate route exists {method}")
         d[method] = handler, params
 
     def get(self, route: str, handler: Callable):
