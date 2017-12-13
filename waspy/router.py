@@ -1,3 +1,8 @@
+import warnings
+
+from contextlib import contextmanager
+from typing import Callable, Union
+
 from enum import Enum
 
 from waspy import webtypes
@@ -50,6 +55,7 @@ class Router:
         self.options_handler = None
 
         self.handle_404 = _send_404  # the 404 route will skip middlewares
+        self._prefix = ''
 
     def _get_and_wrap_routes(self, _d=None):
         if _d is None:
@@ -110,7 +116,7 @@ class Router:
         request._raw_path = raw_path_string
         return wrapped
 
-    def add_static_route(self, method: str, route: str, handler: callable,
+    def add_static_route(self, method: Union[str, Methods], route: str, handler: Callable,
                          skip_middleware=False):
         """
         Adds a static route. A static route is a special route that
@@ -121,17 +127,19 @@ class Router:
 
         All static routes SKIP middlewares
         """
-        if not isinstance(method, Methods):
+        if isinstance(method, str):
             method = Methods(method.upper())
+        route = self._prefix + route
         route = route.lstrip('/').replace('/', '.')
         if route not in self._static_routes:
             self._static_routes[route] = {}
         self._static_routes[route][method] = handler
 
-    def add_route(self, method: str, route: str, handler: callable):
-        if not isinstance(method, Methods):
+    def add_route(self, method: Union[str, Methods], route: str, handler: Callable):
+        if isinstance(method, str):
             method = Methods(method.upper())
 
+        route = self._prefix + route
         route = route.replace('/', '.').lstrip('.')
         d = self._routes
         params = []
@@ -152,32 +160,73 @@ class Router:
             if key not in d:
                 d[key] = {}
             d = d[key]
-
+        if method in d:
+            raise ValueError(f"Duplicate route exists {method}")
         d[method] = handler, params
 
-    def add_get(self, route: str, handler: callable):
+    def get(self, route: str, handler: Callable):
         self.add_route(Methods.GET, route, handler)
 
-    def add_post(self, route: str, handler: callable):
+    def post(self, route: str, handler: Callable):
         self.add_route(Methods.POST, route, handler)
 
-    def add_put(self, route: str, handler: callable):
+    def put(self, route: str, handler: Callable):
         self.add_route(Methods.PUT, route, handler)
 
-    def add_delete(self, route: str, handler: callable):
-        self.add_route(Methods.DELETE, route, handler)
-
-    def add_patch(self, route: str, handler: callable):
+    def patch(self, route: str, handler: Callable):
         self.add_route(Methods.PATCH, route, handler)
 
-    def add_head(self, route: str, handler: callable):
+    def delete(self, route: str, handler: Callable):
+        self.add_route(Methods.DELETE, route, handler)
+
+    def head(self, route: str, handler: Callable):
         self.add_route(Methods.HEAD, route, handler)
 
-    def add_options(self, route: str, handler: callable):
+    def options(self, route: str, handler: Callable):
         self.add_route(Methods.OPTIONS, route, handler)
 
-    def add_generic_options_handler(self, handler: callable):
+    def add_get(self, route: str, handler: Callable):
+        warnings.warn("add_get is deprecated, use get instead", DeprecationWarning)
+        self.add_route(Methods.GET, route, handler)
+
+    def add_post(self, route: str, handler: Callable):
+        warnings.warn("add_post is deprecated, use post instead", DeprecationWarning)
+        self.add_route(Methods.POST, route, handler)
+
+    def add_put(self, route: str, handler: Callable):
+        warnings.warn("add_put is deprecated, use put instead", DeprecationWarning)
+        self.add_route(Methods.PUT, route, handler)
+
+    def add_delete(self, route: str, handler: Callable):
+        warnings.warn("add_delete is deprecated, use delete instead", DeprecationWarning)
+        self.add_route(Methods.DELETE, route, handler)
+
+    def add_patch(self, route: str, handler: Callable):
+        warnings.warn("add_patch is deprecated, use patch instead", DeprecationWarning)
+        self.add_route(Methods.PATCH, route, handler)
+
+    def add_head(self, route: str, handler: Callable):
+        warnings.warn("add_head is deprecated, use head instead", DeprecationWarning)
+        self.add_route(Methods.HEAD, route, handler)
+
+    def add_options(self, route: str, handler: Callable):
+        warnings.warn("add_options is deprecated, use options instead", DeprecationWarning)
+        self.add_route(Methods.OPTIONS, route, handler)
+
+    def add_generic_options_handler(self, handler: Callable):
         """
         Add a handler for all options requests. This WILL bypass middlewares
         """
         self.options_handler = handler
+
+    @contextmanager
+    def prefix(self, prefix):
+        """
+        Adds a prefix to routes contained within.
+        """
+        original_prefix = self._prefix
+        self._prefix += prefix
+        yield self
+        self._prefix = original_prefix
+
+
