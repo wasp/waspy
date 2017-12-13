@@ -119,7 +119,9 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             self._response_futures[message_id] = future
             return await asyncio.wait_for(future, timeout)
 
-    async def _bootstrap_channel(self, channel):
+    async def _bootstrap_channel(self, channel: Channel):
+        if self.channel and self.channel.open():
+            await self.channel.close()
         self.channel = channel
         await self.channel.queue_declare(queue_name=self.response_queue_name,
                                          durable=False,
