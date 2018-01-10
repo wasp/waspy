@@ -2,10 +2,11 @@ import asyncio
 import uuid
 
 import aioamqp
+import re
 from aioamqp.channel import Channel
 
 from .transportabc import TransportABC, ClientTransportABC
-from ..webtypes import Request, Response, Methods
+from ..webtypes import Request, Response
 
 
 class RabbitChannelMixIn:
@@ -86,7 +87,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             await self._starting_future
         if self._starting_future.exception():
             raise self._starting_future.exception()
-        path = path.replace('/', '.').lstrip('.')
+        path = f'{method}.' + path.replace('/', '.').lstrip('.')
         if headers is None:
             headers = {}
         if query:
@@ -206,6 +207,10 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
                                       queue_name=self.queue,
                                       routing_key=routing_key)
 
+    async def register_router(self, router, exchange='amq.topic'):
+        for topic in (parse_url_to_topic(*url) for url in router.urls):
+            await self.bind_to_exchange(exchange=exchange, routing_key=topic)
+
     async def start(self, handler):
         self._handler = handler
         # ToDo: Need to reconnect because of potential forking affects
@@ -321,9 +326,29 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
             return
 
         await self.channel.basic_qos(prefetch_count=1)
-        self._consumer_tag = (await self.channel.basic_consume(
+        resp = await self.channel.basic_consume(
             self.handle_request,
             queue_name=self.queue,
-            no_ack=not self._use_acks)).get('consumer_tag')
+            no_ack=not self._use_acks
+        )
+        self._consumer_tag = resp.get('consumer_tag')
 
 
+def parse_url_to_topic(method, route):
+    """
+    Transforms a URL to a topic.
+
+    `GET /bar/{id}` -> `get.bar.*`
+    `POST /bar/{id}` -> `post.bar.*`
+    `GET /foo/bar/{id}/baz` -? `get.foo.bar.*.baz`
+
+    Possible gotchas
+
+    `GET /foo/{id}` -> `get.foo.*`
+    `GET /foo/{id}:action` -> `get.foo.*`
+
+    However, once it hits the service the router will be able to distinguish the two requests.
+    """
+    route = route.replace('/', '.').lstrip('.')
+    topic = f'{method.value.lower()}.{route}'
+    return re.sub(r"\.\{[^\}]*\}[:\w\d_-]*", ".*", topic)

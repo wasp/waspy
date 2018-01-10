@@ -1,3 +1,4 @@
+import re
 import warnings
 
 from contextlib import contextmanager
@@ -56,6 +57,9 @@ class Router:
 
         self.handle_404 = _send_404  # the 404 route will skip middlewares
         self._prefix = ''
+
+        # A list of tuples (method, url)
+        self.urls = []
 
     def _get_and_wrap_routes(self, _d=None):
         if _d is None:
@@ -140,6 +144,7 @@ class Router:
             method = Methods(method.upper())
 
         route = self._prefix + route
+        self.urls.append((method, route))
         route = route.replace('/', '.').lstrip('.')
         d = self._routes
         params = []
