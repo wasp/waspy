@@ -7,7 +7,7 @@ import re
 from aioamqp.channel import Channel
 
 from .transportabc import TransportABC, ClientTransportABC
-from ..webtypes import Request, Response
+from ..webtypes import Request, Response, Methods
 
 
 logger = logging.getLogger("waspy")
@@ -283,14 +283,19 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         correlation_id = properties.correlation_id
         message_id = properties.message_id
         reply_to = properties.reply_to
-        method = envelope.routing_key.split('.')[0] or 'POST'
-        path = envelope.routing_key.lstrip(method).lstrip('.')
+        route = envelope.routing_key
+        method, path = route.split('.', 1)
+        try:
+            method = Methods(method.upper())
+        except ValueError:
+            path = f'{method}.{path}'
+            method = 'POST'
 
         request = Request(
             headers=headers,
             path=path,
             correlation_id=correlation_id,
-            method=method.upper(),
+            method=method,
             query_string=query,
             body=body,
         )
