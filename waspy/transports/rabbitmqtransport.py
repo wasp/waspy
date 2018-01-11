@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import uuid
 
 import aioamqp
@@ -6,6 +7,9 @@ from aioamqp.channel import Channel
 
 from .transportabc import TransportABC, ClientTransportABC
 from ..webtypes import Request, Response, Methods
+
+
+logger = logging.getLogger("waspy")
 
 
 class RabbitChannelMixIn:
@@ -207,6 +211,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
                                       routing_key=routing_key)
 
     async def start(self, handler):
+        print(f"-- Listening for rabbitmq messages on queue {self.queue} --")
         self._handler = handler
         # ToDo: Need to reconnect because of potential forking affects
         # await self.close()
@@ -221,10 +226,10 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         except asyncio.CancelledError:
             pass
 
-        print('shutting down rabbit')
         # shutting down
+        logger.warning("Shutting down rabbitmq transport")
         await self.channel.basic_cancel(self._consumer_tag)
-
+        await self.close()
         while self._counter > 0:
             await asyncio.sleep(1)
 
@@ -240,8 +245,6 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
                 await self.channel.queue_declare(queue_name=self.queue)
 
         loop.run_until_complete(setup())
-        print('-- Listening for rabbitmq messages on queue {} --'
-              .format(self.queue))
 
     async def close(self):
         self._closing = True
@@ -311,7 +314,6 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         self._counter -= 1
 
     def shutdown(self):
-        print('Rabbit got shutdown signal')
         self._done_future.cancel()
 
     async def _bootstrap_channel(self, channel):

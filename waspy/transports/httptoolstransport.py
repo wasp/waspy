@@ -169,11 +169,13 @@ class HTTPTransport(TransportABC):
             port=self.port,
             reuse_address=True,
             reuse_port=True)
-        print('-- Listening for HTTP on port {} --'.format(self.port))
+        print(f'-- Listening for HTTP on port {self.port} --')
         try:
             await self._done_future
         except asyncio.CancelledError:
             pass
+
+        logger.warning("Shutting down HTTP transport")
         await asyncio.sleep(self.shutdown_wait_period)
         # wait for connections to stop
         times_no_connections = 0
