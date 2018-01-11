@@ -48,7 +48,8 @@ class Application:
                  default_headers: dict=None,
                  debug: bool=False,
                  router: Router=None,
-                 config: Config=None):
+                 config: Config=None,
+                 loop=None):
         if transport is None:
             from waspy.transports.httptransport import HTTPTransport
             transport = HTTPTransport()
@@ -70,11 +71,13 @@ class Application:
         self.debug = debug
         self.router = router
         self.on_start = []
+        self.on_stop = []
         self._client = None
         self.config = config
         self.raven = None
         self.logger = None
         self._cors_handler = None
+        self.loop = loop
 
     @property
     def client(self) -> Client:
@@ -83,24 +86,26 @@ class Application:
         return self._client
 
     def start_shutdown(self, signum=None, frame=None):
-        print('Starting Shutdown')
         # loop = asyncio.get_event_loop()
         for t in self.transport:
             t.shutdown()
 
     def run(self):
+        if not self.loop:
+            self.loop = asyncio.get_event_loop()
+        loop = self.loop
+
         if self.config['debug']:
             logger.setLevel('DEBUG')
+            self.loop.set_debug(True)
 
-        loop = asyncio.get_event_loop()
         # init logger
         self._create_logger()
 
         # add cors support if needed
         self._cors_handler = CORSHandler.from_config(self.config)
         if self._cors_handler:
-            self.router.add_generic_options_handler(
-                self._cors_handler.options_handler)
+            self.router.add_generic_options_handler(self._cors_handler.options_handler)
 
         # wrap handlers in middleware
         loop.run_until_complete(self._wrap_handlers())
@@ -108,9 +113,7 @@ class Application:
             t.listen(loop=loop, config=self.config)
 
         # Call on-startup hooks
-        loop.run_until_complete(asyncio.gather(*[
-            coro(self) for coro in self.on_start
-        ]))
+        loop.run_until_complete(self.run_on_start_hooks())
 
         # todo: fork/add processes?
         tasks = []
@@ -124,9 +127,24 @@ class Application:
         # Run all transports - they shouldn't return until shutdown
         loop.run_until_complete(asyncio.gather(*tasks))
 
-        # todo: Call on-shutdown hooks
+        self.loop.run_until_complete(self.run_on_stop_hooks())
+        self.loop.close()
 
-        # exit
+
+    async def run_on_start_hooks(self):
+        """
+        Run all hooks in on_start. Allows for coroutines and synchronous functions.
+        """
+        logger.debug("Running on start hooks")
+        await self._run_hooks(self.on_start)
+
+    async def run_on_stop_hooks(self):
+        """
+        Run all hooks in on_stop. Allows for coroutines and synchronous functions.
+        """
+        logger.debug("Running on stop hooks")
+        await self._run_hooks(self.on_stop)
+
 
     async def handle_request(self, request: Request) -> Response:
         """
@@ -198,3 +216,12 @@ class Application:
                 environment=env
             )
 
+    async def _run_hooks(self, hooks):
+        coros = []
+        while len(hooks):
+            task = hooks.pop()
+            if asyncio.iscoroutinefunction(task):
+                coros.append(task(self))
+            else:
+                task(self)
+        await asyncio.gather(*coros)

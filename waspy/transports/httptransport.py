@@ -1,10 +1,14 @@
 import asyncio
+import logging
 import socket
 
 import h11
 
 from ..webtypes import Request, Response, ResponseError
 from .transportabc import TransportABC, ClientTransportABC
+
+
+logger = logging.getLogger("waspy")
 
 
 class ClosedError(Exception):
@@ -139,10 +143,11 @@ class HTTPTransport(TransportABC):
         self._sleeping_connections = set()
 
     def listen(self, *, loop: asyncio.AbstractEventLoop, config):
+        logger.info("Starting http transport")
         coro = asyncio.start_server(
             self.handle_incoming_request, '0.0.0.0', self.port, loop=loop)
         self._server = loop.run_until_complete(coro)
-        print('-- Listening for HTTP on port {} --'.format(self.port))
+        logger.info(f'-- Listening for HTTP on port {self.port} --')
 
     async def start(self, request_handler):
         self._handler = request_handler
@@ -152,8 +157,7 @@ class HTTPTransport(TransportABC):
             pass
 
         # Enter shutdown step
-
-        print('shutting down http')
+        logger.warning("Shutting down HTTP transport")
         self._shutting_down = True
         for coro in self._sleeping_connections:
             coro.cancel()
