@@ -3,10 +3,11 @@ import logging
 import uuid
 
 import aioamqp
+import re
 from aioamqp.channel import Channel
 
 from .transportabc import TransportABC, ClientTransportABC
-from ..webtypes import Request, Response, Methods
+from ..webtypes import Request, Response
 
 
 logger = logging.getLogger("waspy")
@@ -77,7 +78,6 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
 
         self._starting_future: asyncio.Future = asyncio.ensure_future(self.connect())
 
-
     async def make_request(self, service: str, method: str, path: str,
                            body: bytes = None, query: str = None,
                            headers: dict = None, correlation_id: str = None,
@@ -90,7 +90,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             await self._starting_future
         if self._starting_future.exception():
             raise self._starting_future.exception()
-        path = path.replace('/', '.').lstrip('.')
+        path = f'{method.lower()}.' + path.replace('/', '.').lstrip('.')
         if headers is None:
             headers = {}
         if query:
@@ -210,6 +210,14 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
                                       queue_name=self.queue,
                                       routing_key=routing_key)
 
+    async def register_router(self, router, exchange='amq.topic'):
+        if not self.channel:
+            # Something weird is going on here?
+            return
+
+        for topic in (parse_url_to_topic(*url) for url in router.urls):
+            await self.bind_to_exchange(exchange=exchange, routing_key=topic)
+
     async def start(self, handler):
         print(f"-- Listening for rabbitmq messages on queue {self.queue} --")
         self._handler = handler
@@ -268,7 +276,6 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
             return
 
         self._counter += 1
-        route = envelope.routing_key
         headers = properties.headers or {}
         query = headers.pop('x-wasp-query-string', '').lstrip('?')
         headers['content-type'] = properties.content_type
@@ -276,13 +283,14 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         correlation_id = properties.correlation_id
         message_id = properties.message_id
         reply_to = properties.reply_to
-        method = properties.type or 'POST'
+        method = envelope.routing_key.split('.')[0] or 'POST'
+        path = envelope.routing_key.lstrip(method).lstrip('.')
 
         request = Request(
             headers=headers,
-            path=route,
+            path=path,
             correlation_id=correlation_id,
-            method=method,
+            method=method.upper(),
             query_string=query,
             body=body,
         )
@@ -323,9 +331,29 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
             return
 
         await self.channel.basic_qos(prefetch_count=1)
-        self._consumer_tag = (await self.channel.basic_consume(
+        resp = await self.channel.basic_consume(
             self.handle_request,
             queue_name=self.queue,
-            no_ack=not self._use_acks)).get('consumer_tag')
+            no_ack=not self._use_acks
+        )
+        self._consumer_tag = resp.get('consumer_tag')
 
 
+def parse_url_to_topic(method, route):
+    """
+    Transforms a URL to a topic.
+
+    `GET /bar/{id}` -> `get.bar.*`
+    `POST /bar/{id}` -> `post.bar.*`
+    `GET /foo/bar/{id}/baz` -? `get.foo.bar.*.baz`
+
+    Possible gotchas
+
+    `GET /foo/{id}` -> `get.foo.*`
+    `GET /foo/{id}:action` -> `get.foo.*`
+
+    However, once it hits the service the router will be able to distinguish the two requests.
+    """
+    route = route.replace('/', '.').lstrip('.')
+    topic = f'{method.value.lower()}.{route}'
+    return re.sub(r"\.\{[^\}]*\}[:\w\d_-]*", ".*", topic)

@@ -81,3 +81,23 @@ def test_duplicate_handler():
         router_.get('/test/path', 6)
 
     router_.get('/test/path/{param}', 5)
+
+def test_urls(router):
+    urls = [
+        (Methods.GET, '/single'),
+        (Methods.GET, '/double/double'),
+        (Methods.GET, '/something/static/and/long'),
+        (Methods.GET, '/single/{id}'),
+        (Methods.GET, '/foo/{fooid}/bar/{barid}'),
+        (Methods.GET, '/foo/{fooid}/bar'),
+        (Methods.GET, '/foo/bar/baz/{id}'),
+        (Methods.GET, '/multiple/{ids}/{in}/{a}/row'),
+        (Methods.GET, '/foo/{fooid}:action'),
+        (Methods.GET, '/foo/{fooid}:action2'),
+        (Methods.GET, '/test/test'),
+        (Methods.GET, '/nest-1/nest-2/nest-3/{nest3id}/nest-4/nest-4-get'),
+        (Methods.GET, '/nest-1/nest-2/nest-3/{nest3id}/nest-4/nest-5/nest-5-get'),
+        (Methods.GET, '/nest-1/nest-2/nest-3/{nest3id}/nest-4/nest-4-get-2')
+    ]
+    for idx, url in enumerate(urls):
+        assert url == router.urls[idx]
