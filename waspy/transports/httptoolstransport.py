@@ -169,7 +169,7 @@ class HTTPTransport(TransportABC):
             port=self.port,
             reuse_address=True,
             reuse_port=True)
-        logger.info(f'-- Listening for HTTP on port {self.port} --')
+        print(f'-- Listening for HTTP on port {self.port} --')
         try:
             await self._done_future
         except asyncio.CancelledError:

@@ -143,7 +143,7 @@ class HTTPTransport(TransportABC):
         self._sleeping_connections = set()
 
     def listen(self, *, loop: asyncio.AbstractEventLoop, config):
-        logger.info("Starting http transport")
+        print("-- Listening for HTTP on port {self.port} --")
         coro = asyncio.start_server(
             self.handle_incoming_request, '0.0.0.0', self.port, loop=loop)
         self._server = loop.run_until_complete(coro)

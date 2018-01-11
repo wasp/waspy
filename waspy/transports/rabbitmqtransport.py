@@ -211,7 +211,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
                                       routing_key=routing_key)
 
     async def start(self, handler):
-        logger.info(f"-- Listening for rabbitmq messages on queue {self.queue} --")
+        print(f"-- Listening for rabbitmq messages on queue {self.queue} --")
         self._handler = handler
         # ToDo: Need to reconnect because of potential forking affects
         # await self.close()
@@ -227,8 +227,8 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
             pass
 
         # shutting down
-        logger.info("Shutting down rabbitmq transport")
-        await self.channel.basic_cancel(self._consumer_tag, no_wait=True)
+        logger.warning("Shutting down rabbitmq transport")
+        await self.channel.basic_cancel(self._consumer_tag)
         await self.close()
         while self._counter > 0:
             await asyncio.sleep(1)
