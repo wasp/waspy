@@ -28,17 +28,19 @@ class _HTTPClientConnection:
         self._done = False
 
     async def connect(self, service, port):
+        logger.debug(f'Connecting to {service} on {port}')
         self.reader, self.writer = await \
             asyncio.open_connection(service, port)
+        logger.debug(f'Connection to {service} complete')
 
     def send(self, method, path, headers, body):
-        self.writer.write(f'{method.upper()} {path} HTTP/1.1\r\n'
+        self.writer.write(f'{method.upper()} {path} HTTP/1.0\r\n'
                           .encode('latin-1'))
         for header, value in headers:
             self.writer.write(f'{header}: {value}\r\n'.encode('latin-1'))
         self.writer.write(b'\r\n')
         if body:
-            print(body)
+            self.writer.write(body)
 
     async def get_response(self):
         while True:
@@ -46,7 +48,7 @@ class _HTTPClientConnection:
             self.http_parser.feed_data(data)
             if self._done:
                 return self.response
-            print('looped')
+            logger.debug('getting response looped')
         
     def close(self):
         self.writer.close()
