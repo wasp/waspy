@@ -28,10 +28,8 @@ class _HTTPClientConnection:
         self._done = False
 
     async def connect(self, service, port):
-        logger.debug(f'Connecting to {service} on {port}')
         self.reader, self.writer = await \
             asyncio.open_connection(service, port)
-        logger.debug(f'Connection to {service} complete')
 
     def send(self, method, path, headers, body):
         self.writer.write(f'{method.upper()} {path} HTTP/1.0\r\n'
@@ -48,8 +46,7 @@ class _HTTPClientConnection:
             self.http_parser.feed_data(data)
             if self._done:
                 return self.response
-            logger.debug('getting response looped')
-        
+
     def close(self):
         self.writer.close()
 
