@@ -133,6 +133,7 @@ class Request:
                 f'query_string={self.query_string}, body={self.body}, '
                 f'content_type={self.content_type})')
 
+
 class Response:
     def __init__(self, headers=None, correlation_id=None,
                  body=None, status=HTTPStatus.OK,

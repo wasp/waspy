@@ -83,7 +83,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
                            headers: dict = None, correlation_id: str = None,
                            content_type: str = None,
                            exchange: str = 'amq.topic',
-                           timeout=30,
+                           timeout: int = 30,
                            **kwargs):
 
         if not self._starting_future.done():
@@ -108,7 +108,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         }
         if method != 'PUBLISH':
             properties['reply_to'] = self.response_queue_name
-            properties['expiration']: '30000'
+            properties['expiration']: str(timeout * 1000)
 
         if content_type:
             properties['content_type'] = content_type
@@ -121,7 +121,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         if method != 'PUBLISH':
             future = asyncio.Future()
             self._response_futures[message_id] = future
-            return await asyncio.wait_for(future, timeout)
+            return await future
 
     async def _bootstrap_channel(self, channel: Channel):
         if self.channel and self.channel.open():
