@@ -277,7 +277,10 @@ class _HTTPServerProtocol(asyncio.Protocol):
         url = parse_url(url)
         if url.query:
             self.request.query_string = url.query.decode('latin-1')
-        self.request.path = url.path.decode('latin-1').lstrip(self._parent.prefix)
+        path = url.path.decode('latin-1')
+        if path.startswith(self._parent.prefix):
+            path = path[len(self._parent.prefix):]
+        self.request.path = path
 
     """
     End parsing methods
