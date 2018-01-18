@@ -23,6 +23,7 @@ class Client:
                            correlation_id: str=None,
                            content_type: str='application/json',
                            context: Request=None,
+                           timeout=30,
                            **kwargs) -> asyncio.coroutine:
         """
         Make a request to another service. If `context` is provided, then
@@ -53,7 +54,7 @@ class Client:
         if isinstance(query_params, dict):
             query_string = parse.urlencode(query_params)
         elif isinstance(query_params, QueryParams):
-            query_string = str(QueryParams)
+            query_string = str(query_params)
         else:
             query_string = ''
 
@@ -65,10 +66,10 @@ class Client:
             correlation_id = str(uuid.uuid4())
         if isinstance(body, str):
             body = body.encode()
-        response = self.transport.make_request(
+        response = asyncio.wait_for(self.transport.make_request(
             service, method.name, path, body=body, query=query_string,
             headers=headers, correlation_id=correlation_id,
-            content_type=content_type, **kwargs)
+            content_type=content_type, **kwargs), timeout=timeout)
         return response  # response is a coroutine that must be awaited
 
     def get(self, service, path, **kwargs):

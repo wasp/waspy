@@ -1,19 +1,10 @@
-"""
-This is a rewrite of the HTTP transport to use httptools parser
-It currently still uses h11 for client transport
-"""
-
 import asyncio
 import traceback
-import time
 import logging
+from http import HTTPStatus
 
-import h11
-try:
-    from httptools import HttpRequestParser, HttpResponseParser, HttpParserError, \
+from httptools import HttpRequestParser, HttpResponseParser, HttpParserError, \
         parse_url
-except ImportError:
-    pass  # You need to have httptools installed to use this
 
 from ..webtypes import Request, Response
 from .transportabc import TransportABC, ClientTransportABC
@@ -26,37 +17,66 @@ class ClosedError(Exception):
 
 
 class _HTTPClientConnection:
-    slots = ('reader', 'writer', 'conn', 'port', 'service')
+    slots = ('reader', 'writer', 'http_parser', '_done', '_data')
 
-    def __init__(self, service, port):
+    def __init__(self):
         self.reader = None
         self.writer = None
-        self.port = port
-        self.service = service
-        self.conn = h11.Connection(our_role=h11.CLIENT)
+        self.http_parser = HttpResponseParser(self)
+        self.response = None
+        self._data = b''
+        self._done = False
 
-    async def connect(self):
+    async def connect(self, service, port):
         self.reader, self.writer = await \
-            asyncio.open_connection(self.service, self.port)
+            asyncio.open_connection(service, port)
 
-    def send(self, event):
-        data = self.conn.send(event)
-        if data is not None:
-            self.writer.write(data)
+    def send(self, method, path, headers, body):
+        self.writer.write(f'{method.upper()} {path} HTTP/1.1\r\n'
+                          .encode('latin-1'))
+        for header, value in headers:
+            self.writer.write(f'{header}: {value}\r\n'.encode('latin-1'))
+        self.writer.write(b'\r\n')
+        if body:
+            print(body)
 
-    async def next_event(self):
+    async def get_response(self):
         while True:
-            event = self.conn.next_event()
-            if event is h11.NEED_DATA:
-                data = await self.reader.read(1064)
-                self.conn.receive_data(data)
-
-            else:
-                return event
-
+            data = await self.reader.read(1064)
+            self.http_parser.feed_data(data)
+            if self._done:
+                return self.response
+            print('looped')
+        
     def close(self):
-        self.send(h11.ConnectionClosed())
         self.writer.close()
+
+    """ http parsing methods below """
+
+    def on_message_begin(self):
+        self.response = Response()
+
+    def on_header(self, name, value):
+        name = name.decode('latin-1')
+        value = value.decode()
+        if name == 'X-Correlation-ID':
+            self.response.correlation_id = value
+        elif name.lower() == 'content-type':
+            self.response.content_type = value
+        else:
+            self.response.headers[name] = value
+
+    def on_headers_complete(self):
+        self.response.status = HTTPStatus(self.http_parser.get_status_code())
+
+    def on_body(self, body):
+        self._data += body
+
+    def on_message_complete(self):
+        self.response._data = self._data
+        self.response.body = self._data.decode()
+        self._data = b''
+        self._done = True
 
 
 class HTTPClientTransport(ClientTransportABC):
@@ -76,48 +96,29 @@ class HTTPClientTransport(ClientTransportABC):
         headers['Host'] = service
         if port != 80:
             headers['Host'] += ':{}'.format(port)
+        headers.pop('host', None)
         headers['Connection'] = 'close'
+        headers.pop('connection', None)
         if correlation_id:
             headers['X-Correlation-Id'] = correlation_id
         if query:
             path += '?' + query
         if content_type:
             headers['Content-Type'] = content_type
+        headers.pop('content-type', None)
         if body:
             headers['Content-Length'] = str(len(body))
+        headers.pop('content-length', None)
+        headers['User-Agent'] = headers.pop('user-agent', 'waspy-http-client')
 
         # now make a connection and send it
-        connection = _HTTPClientConnection(service, port)
-        await connection.connect()
-        connection.send(h11.Request(method=method, target=path,
-                                    headers=headers.items()))
-        if body:
-            connection.send(h11.Data(data=body))
-
-        connection.send(h11.EndOfMessage())
-
-        response = await connection.next_event()
-        assert type(response) is h11.Response
-
-        # form response object
-
-        status_code = response.status_code
-        response_headers = response.headers
-        response_headers = {k.decode(): v.decode() for k,v in response_headers}
-
-        result = Response(headers=response_headers,
-                          correlation_id=correlation_id,
-                          status=status_code)
-
-        body = b''
-        event = None
-        while type(event) is not h11.EndOfMessage:
-            event = await connection.next_event()
-            if type(event) is h11.Data:
-                body += body
-
-        result._data = body.decode()
-        connection.close()
+        connection = _HTTPClientConnection()
+        await connection.connect(service, port)
+        connection.send(method, path, headers.items(), body)
+        try:
+            result = await connection.get_response()
+        finally:
+            connection.close()
         return result
 
 
@@ -249,7 +250,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
         self.data = b''
 
     def on_header(self, name, value):
-        key = name.decode('ASCII').lower()
+        key = name.decode('latin-1').lower()
         if not value:
             value = b''
 
@@ -261,7 +262,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
             self.request.content_type = val
 
     def on_headers_complete(self):
-        self.request.method = self.http_parser.get_method().decode('ASCII')
+        self.request.method = self.http_parser.get_method().decode('latin-1')
 
     def on_body(self, body: bytes):
         self.data += body
@@ -276,8 +277,8 @@ class _HTTPServerProtocol(asyncio.Protocol):
     def on_url(self, url):
         url = parse_url(url)
         if url.query:
-            self.request.query_string = url.query.decode('ASCII')
-        self.request.path = url.path.decode('ASCII')
+            self.request.query_string = url.query.decode('latin-1')
+        self.request.path = url.path.decode('latin-1')
 
     """
     End parsing methods
@@ -318,11 +319,15 @@ class _HTTPServerProtocol(asyncio.Protocol):
             headers += '{header}: {value}\r\n'.format(header=header,
                                                       value=value)
 
-        result = headers.encode('ASCII') + b'\r\n'
+        result = headers.encode('latin-1') + b'\r\n'
         if response.data:
             result += response.data
 
-        self._transport.write(result)
+        try:
+            self._transport.write(result)
+        except AttributeError:
+            # "NoneType has no attribute 'write'" because transport is closed
+            logger.debug('Connection closed prematurely, most likely by client')
         self.request = 0
         self.data = 0
 
