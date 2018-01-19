@@ -2,6 +2,7 @@ import asyncio
 import logging
 import signal
 import sys
+from functools import wraps
 from typing import List, Union, Iterable
 from http import HTTPStatus
 from concurrent.futures import CancelledError
@@ -20,6 +21,7 @@ logger = logging.getLogger('waspy')
 
 
 async def response_wrapper_factory(app, handler):
+    @wraps(handler)
     async def wrap_response_middleware(request):
         response = await handler(request)
         if not isinstance(response, Response):
