@@ -210,7 +210,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
     """ HTTP Protocol handler.
         Should only be used by HTTPServerTransport
     """
-    __slots__ = ('_parent', '_transport', 'data', 'http_parser',
+    __slots__ = ('_parent', '_transport', '_task', 'data', 'http_parser',
                  'request')
 
     def __init__(self, *, parent, loop):
@@ -220,6 +220,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
         self.http_parser = HttpRequestParser(self)
         self.request = None
         self._loop = loop
+        self._task: asyncio.Task = None
 
     """ The next 3 methods are for asyncio.Protocol handling """
     def connection_made(self, transport):
@@ -228,6 +229,8 @@ class _HTTPServerProtocol(asyncio.Protocol):
 
     def connection_lost(self, exc):
         self._parent._connections.discard(self)
+        if self._task:
+            self._task.cancel()
         self._transport = None
 
     def data_received(self, data):
@@ -272,6 +275,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
             self._parent.handle_incoming_request(self.request)
         )
         task.add_done_callback(self.handle_response)
+        self._task = task
 
     def on_url(self, url):
         url = parse_url(url)
@@ -296,6 +300,10 @@ class _HTTPServerProtocol(asyncio.Protocol):
                          body={'reason': 'Something really bad happened'}))
 
     def send_response(self, response):
+        if response is None:
+            # connection closed, no response
+            return
+
         headers = 'HTTP/1.1 {status_code} {status_message}\r\n'.format(
             status_code=response.status.value,
             status_message=response.status.phrase,

@@ -301,6 +301,9 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         )
 
         response = await self._handler(request)
+        if response is None:
+            # task got cancelled. Dont send a response.
+            return
         if reply_to:
             response.headers['Status'] = str(response.status.value)
 
