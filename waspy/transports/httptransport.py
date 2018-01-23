@@ -92,10 +92,10 @@ class HTTPClientTransport(ClientTransportABC):
             path = '/' + path
         if headers is None:
             headers = {}
-        headers['Host'] = service
-        if port != 80:
-            headers['Host'] += ':{}'.format(port)
-        headers.pop('host', None)
+        if 'Host' not in headers and 'host' not in headers:
+            headers['Host'] = service
+            if port != 80:
+                headers['Host'] += ':{}'.format(port)
         headers['Connection'] = 'close'
         headers.pop('connection', None)
         if correlation_id:
