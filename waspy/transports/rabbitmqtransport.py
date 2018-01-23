@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import uuid
-from http import HTTPStatus
 
 import aioamqp
 import re
@@ -146,7 +145,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         response = Response(headers=headers,
                             correlation_id=properties.correlation_id,
                             body=body,
-                            status=HTTPStatus(status),
+                            status=int(status),
                             content_type=properties.content_type)
 
         future.set_result(response)
