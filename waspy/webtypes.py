@@ -217,3 +217,8 @@ class ResponseError(Exception):
 class JSONDecodeError(ResponseError):
     status = 400
     reason = 'Invalid Json'
+
+
+class NotRoutableError(ResponseError):
+    status = 404
+    reason = 'No route found'

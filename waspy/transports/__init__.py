@@ -4,4 +4,3 @@ from .rabbitmqtransport import RabbitMQTransport, RabbitMQClientTransport
 from .transportabc import TransportABC
 from .testtransport import TestTransport
 
-

@@ -4,13 +4,115 @@ import uuid
 
 import aioamqp
 import re
-from aioamqp.channel import Channel
+from aioamqp import channel
 
 from .transportabc import TransportABC, ClientTransportABC
-from ..webtypes import Request, Response, Methods
+from ..webtypes import Request, Response, Methods, NotRoutableError
 
 
 logger = logging.getLogger("waspy")
+
+
+
+""" This is ugly, but you do what you gotta do
+
+So... on that note: Lets do some monkey patching!!
+We need to support mandatory bit, and handle returned messages, but
+aioamqp doesnt support it yet. (follow https://github.com/Polyconseil/aioamqp/pull/158)
+
+"""
+import io
+from aioamqp import frame as amqp_frame
+from aioamqp import constants as amqp_constants
+
+
+class ReturnEnvelope:
+    __slots__ = ('reply_code', 'reply_text',
+                 'exchange_name', 'routing_key')
+
+    def __init__(self, reply_code, reply_text, exchange_name, routing_key):
+        self.reply_code = reply_code
+        self.reply_text = reply_text
+        self.exchange_name = exchange_name
+        self.routing_key = routing_key
+
+
+async def basic_return(self, frame):
+    response = amqp_frame.AmqpDecoder(frame.payload)
+    reply_code = response.read_short()
+    reply_text = response.read_shortstr()
+    exchange_name = response.read_shortstr()
+    routing_key = response.read_shortstr()
+    content_header_frame = await self.protocol.get_frame()
+
+    buffer = io.BytesIO()
+    while buffer.tell() < content_header_frame.body_size:
+        content_body_frame = await self.protocol.get_frame()
+        buffer.write(content_body_frame.payload)
+
+    body = buffer.getvalue()
+    envelope = ReturnEnvelope(reply_code, reply_text,
+                              exchange_name, routing_key)
+    properties = content_header_frame.properties
+    callback = self.return_callback
+    if self.return_callback is None:
+        # they have set mandatory bit, but havent added a callback
+        logger.warning(
+            'You have received a returned message, but dont have a callback registered for returns.'
+            ' Please set channel.return_callback')
+    else:
+        await callback(self, body, envelope, properties)
+
+
+async def dispatch_frame(self, frame):
+    methods = {
+        (amqp_constants.CLASS_CHANNEL, amqp_constants.CHANNEL_OPEN_OK): self.open_ok,
+        (amqp_constants.CLASS_CHANNEL, amqp_constants.CHANNEL_FLOW_OK): self.flow_ok,
+        (amqp_constants.CLASS_CHANNEL, amqp_constants.CHANNEL_CLOSE_OK): self.close_ok,
+        (amqp_constants.CLASS_CHANNEL, amqp_constants.CHANNEL_CLOSE): self.server_channel_close,
+
+        (amqp_constants.CLASS_EXCHANGE, amqp_constants.EXCHANGE_DECLARE_OK): self.exchange_declare_ok,
+        (amqp_constants.CLASS_EXCHANGE, amqp_constants.EXCHANGE_BIND_OK): self.exchange_bind_ok,
+        (amqp_constants.CLASS_EXCHANGE, amqp_constants.EXCHANGE_UNBIND_OK): self.exchange_unbind_ok,
+        (amqp_constants.CLASS_EXCHANGE, amqp_constants.EXCHANGE_DELETE_OK): self.exchange_delete_ok,
+
+        (amqp_constants.CLASS_QUEUE, amqp_constants.QUEUE_DECLARE_OK): self.queue_declare_ok,
+        (amqp_constants.CLASS_QUEUE, amqp_constants.QUEUE_DELETE_OK): self.queue_delete_ok,
+        (amqp_constants.CLASS_QUEUE, amqp_constants.QUEUE_BIND_OK): self.queue_bind_ok,
+        (amqp_constants.CLASS_QUEUE, amqp_constants.QUEUE_UNBIND_OK): self.queue_unbind_ok,
+        (amqp_constants.CLASS_QUEUE, amqp_constants.QUEUE_PURGE_OK): self.queue_purge_ok,
+
+        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_QOS_OK): self.basic_qos_ok,
+        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_CONSUME_OK): self.basic_consume_ok,
+        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_CANCEL_OK): self.basic_cancel_ok,
+        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_GET_OK): self.basic_get_ok,
+        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_GET_EMPTY): self.basic_get_empty,
+        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_DELIVER): self.basic_deliver,
+        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_CANCEL): self.server_basic_cancel,
+        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_ACK): self.basic_server_ack,
+        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_NACK): self.basic_server_nack,
+        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_RECOVER_OK): self.basic_recover_ok,
+        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_RETURN): self.basic_return,
+
+        (amqp_constants.CLASS_CONFIRM, amqp_constants.CONFIRM_SELECT_OK): self.confirm_select_ok,
+    }
+
+    if (frame.class_id, frame.method_id) not in methods:
+        raise NotImplementedError("Frame (%s, %s) is not implemented" % (frame.class_id, frame.method_id))
+    await methods[(frame.class_id, frame.method_id)](frame)
+
+
+channel.Channel.dispatch_frame = dispatch_frame
+channel.Channel.basic_return = basic_return
+
+""" End of monkey patching"""
+
+
+from aioamqp.channel import Channel
+
+
+def parse_rabbit_message(body, envelope, properties):
+    return Response()
 
 
 class RabbitChannelMixIn:
@@ -84,6 +186,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
                            content_type: str = None,
                            exchange: str = 'amq.topic',
                            timeout: int = 30,
+                           mandatory: bool = False,
                            **kwargs):
 
         if not self._starting_future.done():
@@ -116,7 +219,8 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         await self.channel.basic_publish(exchange_name=exchange,
                                          routing_key=path,
                                          properties=properties,
-                                         payload=body)
+                                         payload=body,
+                                         mandatory=mandatory)
 
         if method != 'PUBLISH':
             future = asyncio.Future()
@@ -131,6 +235,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
                                          durable=False,
                                          exclusive=False,
                                          auto_delete=True)
+        self.channel.return_callback = self.handle_return
         self._consumer_tag = (await self.channel.basic_consume(
             self.handle_responses,
             queue_name=self.response_queue_name,
@@ -149,6 +254,19 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
                             content_type=properties.content_type)
 
         future.set_result(response)
+
+    async def handle_return(self, channel, body, envelope, properties):
+        future = self._response_futures.get(properties.message_id, None)
+        if not future:
+            logger.warning('Got a returned message with nowhere to send it')
+            return
+        if envelope.reply_code == 312:
+            # no route
+            future.set_exception(NotRoutableError())
+        else:
+            logger.error(f'Got a return with an unknown reply code: '
+                         f'{envelope.reply_code}')
+
 
     async def close(self):
         self._closing = True
