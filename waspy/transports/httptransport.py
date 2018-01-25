@@ -28,8 +28,12 @@ class _HTTPClientConnection:
         self._done = False
 
     async def connect(self, service, port):
+        use_ssl = service.startswith('https://') or port == 443
+        if service.startswith('http'):
+            service = service.replace('http://', '').replace('https://', '')
+
         self.reader, self.writer = await \
-            asyncio.open_connection(service, port)
+            asyncio.open_connection(service, port, ssl=use_ssl)
 
     def send(self, method, path, headers, body):
         self.writer.write(f'{method.upper()} {path} HTTP/1.0\r\n'
