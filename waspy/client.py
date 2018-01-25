@@ -66,10 +66,12 @@ class Client:
             correlation_id = str(uuid.uuid4())
         if isinstance(body, str):
             body = body.encode()
-        response = asyncio.wait_for(self.transport.make_request(
-            service, method.name, path, body=body, query=query_string,
-            headers=headers, correlation_id=correlation_id,
-            content_type=content_type, **kwargs), timeout=timeout)
+        response = asyncio.wait_for(
+            self.transport.make_request(
+                service, method.name, path, body=body, query=query_string,
+                headers=headers, correlation_id=correlation_id,
+                content_type=content_type, timeout=timeout, **kwargs),
+            timeout=timeout)
         return response  # response is a coroutine that must be awaited
 
     def get(self, service, path, **kwargs):
