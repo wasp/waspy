@@ -193,6 +193,8 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             await self._starting_future
         if self._starting_future.exception():
             raise self._starting_future.exception()
+        if correlation_id is None:
+            correlation_id = str(uuid.uuid4())
         path = f'{method.lower()}.' + path.replace('/', '.').lstrip('.')
         if headers is None:
             headers = {}
@@ -396,8 +398,6 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         self._counter += 1
         headers = properties.headers or {}
         query = headers.pop('x-wasp-query-string', '').lstrip('?')
-        headers['content-type'] = properties.content_type
-        headers['content-encoding'] = properties.content_encoding
         correlation_id = properties.correlation_id
         message_id = properties.message_id
         reply_to = properties.reply_to
@@ -417,6 +417,11 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
             query_string=query,
             body=body,
         )
+        if properties.content_type:
+            headers['content-type'] = properties.content_type
+            request.content_type = properties.content_type
+        if properties.content_encoding:
+            headers['content-encoding'] = properties.content_encoding
 
         response = await self._handler(request)
         if response is None:
