@@ -27,13 +27,7 @@ class _HTTPClientConnection:
         self._data = b''
         self._done = False
 
-    async def connect(self, service, port):
-        use_ssl = service.startswith('https://') or port == 443
-        if service.startswith('http'):
-            service = service.replace('http://', '').replace('https://', '')
-        if use_ssl and port == 80:
-            port = 443
-
+    async def connect(self, service, port, use_ssl):
         self.reader, self.writer = await \
             asyncio.open_connection(service, port, ssl=use_ssl)
 
@@ -98,9 +92,14 @@ class HTTPClientTransport(ClientTransportABC):
             path = '/' + path
         if headers is None:
             headers = {}
+        use_ssl = service.startswith('https://') or port == 443
+        if service.startswith('http'):
+            service = service.replace('http://', '').replace('https://', '')
+        if use_ssl and port == 80:
+            port = 443
         if 'Host' not in headers and 'host' not in headers:
             headers['Host'] = service
-            if port != 80:
+            if port not in (80, 443):
                 headers['Host'] += ':{}'.format(port)
         headers['Connection'] = 'close'
         headers.pop('connection', None)
