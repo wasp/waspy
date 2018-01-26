@@ -31,7 +31,8 @@ class _HTTPClientConnection:
         use_ssl = service.startswith('https://') or port == 443
         if service.startswith('http'):
             service = service.replace('http://', '').replace('https://', '')
-            print(service)
+        if use_ssl and port == 80:
+            port = 443
 
         self.reader, self.writer = await \
             asyncio.open_connection(service, port, ssl=use_ssl)
