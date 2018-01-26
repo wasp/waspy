@@ -117,7 +117,7 @@ class HTTPClientTransport(ClientTransportABC):
 
         # now make a connection and send it
         connection = _HTTPClientConnection()
-        await connection.connect(service, port)
+        await connection.connect(service, port, use_ssl)
         connection.send(method, path, headers.items(), body)
         try:
             result = await connection.get_response()
