@@ -130,9 +130,7 @@ class Application:
         # Run all transports - they shouldn't return until shutdown
         loop.run_until_complete(asyncio.gather(*tasks))
 
-        self.loop.run_until_complete(self.run_on_stop_hooks())
-        self.loop.close()
-
+        self.shutdown()
 
     async def run_on_start_hooks(self):
         """
@@ -232,3 +230,7 @@ class Application:
             else:
                 task(self)
         await asyncio.gather(*coros)
+
+    def shutdown(self):
+        self.loop.run_until_complete(self.run_on_stop_hooks())
+        self.loop.close()

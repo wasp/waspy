@@ -25,6 +25,7 @@ class TestTransport(TransportABC):
     def run_app(self, app):
         self.app = app
         app.transport = (self,)
+        app.shutdown = lambda: ''
         app.run()
         # now patch app to have send_request methods as well
         def send_request_for_app(request):
