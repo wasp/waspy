@@ -12,6 +12,7 @@ from .client import Client
 from .webtypes import Request, Response, ResponseError
 from .router import Router
 from .transports.transportabc import TransportABC
+from .transports.rabbitmqtransport import NackMePleaseError
 from .configuration import Config, ConfigError
 from . import errorlogging
 
@@ -173,6 +174,10 @@ class Application:
             # This error can happen if a client closes the connection
             # The response shouldnt really ever be used
             return None
+
+        except NackMePleaseError:
+            """ See message where this error is defined """
+            raise
 
         except Exception:
             exc_info = sys.exc_info()

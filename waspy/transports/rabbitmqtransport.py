@@ -13,7 +13,6 @@ from ..webtypes import Request, Response, Methods, NotRoutableError
 logger = logging.getLogger("waspy")
 
 
-
 """ This is ugly, but you do what you gotta do
 
 So... on that note: Lets do some monkey patching!!
@@ -106,6 +105,13 @@ channel.Channel.dispatch_frame = dispatch_frame
 channel.Channel.basic_return = basic_return
 
 """ End of monkey patching"""
+
+
+class NackMePleaseError(Exception):
+    """ This is a dirty dirty dirty dirty hack that is in place until
+        I have time to add a real worker tier type connector support in waspy
+        TODO: Please get rid of this as soon as your able to
+    """
 
 
 from aioamqp.channel import Channel
