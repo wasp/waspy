@@ -201,7 +201,10 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             raise self._starting_future.exception()
         if correlation_id is None:
             correlation_id = str(uuid.uuid4())
-        path = f'{method.lower()}.' + path.replace('/', '.').lstrip('.')
+        path = path.replace('/', '.').lstrip('.')
+        if method != 'PUBLISH':
+            path = f'{method.lower()}.' + path
+
         if headers is None:
             headers = {}
         if query:
