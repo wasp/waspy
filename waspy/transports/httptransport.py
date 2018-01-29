@@ -322,8 +322,6 @@ class _HTTPServerProtocol(asyncio.Protocol):
 
         if response.data:
             headers += 'Content-Type: {}\r\n'.format(response.content_type)
-            headers.pop('Content-Length', None)
-            headers.pop('content-length', None)
             headers += 'Content-Length: {}\r\n'.format(len(response.data))
             if ('transfer-encoding' in response.headers or
                         'Transfer-Encoding' in response.headers):
@@ -334,6 +332,8 @@ class _HTTPServerProtocol(asyncio.Protocol):
         else:
             headers += 'Content-Length: {}\r\n'.format(0)
         for header, value in response.headers.items():
+            if header in ('Content-Length', 'content-lenth'):
+                continue
             headers += '{header}: {value}\r\n'.format(header=header,
                                                       value=value)
 
