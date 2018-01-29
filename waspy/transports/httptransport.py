@@ -110,9 +110,10 @@ class HTTPClientTransport(ClientTransportABC):
         if content_type:
             headers['Content-Type'] = content_type
         headers.pop('content-type', None)
+        headers.pop('content-length', None)
+        headers.pop('Content-Length', None)
         if body:
             headers['Content-Length'] = str(len(body))
-        headers.pop('content-length', None)
         headers['User-Agent'] = headers.pop('user-agent', 'waspy-http-client')
 
         # now make a connection and send it
@@ -321,6 +322,8 @@ class _HTTPServerProtocol(asyncio.Protocol):
 
         if response.data:
             headers += 'Content-Type: {}\r\n'.format(response.content_type)
+            headers.pop('Content-Length', None)
+            headers.pop('content-length', None)
             headers += 'Content-Length: {}\r\n'.format(len(response.data))
             if ('transfer-encoding' in response.headers or
                         'Transfer-Encoding' in response.headers):
