@@ -72,8 +72,7 @@ class _HTTPClientConnection:
         self._data += body
 
     def on_message_complete(self):
-        self.response._data = self._data
-        self.response.body = self._data.decode()
+        self.response.body = self._data
         self._data = b''
         self._done = True
 
