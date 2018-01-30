@@ -263,8 +263,8 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
                             body=body,
                             status=int(status),
                             content_type=properties.content_type)
-
-        future.set_result(response)
+        if not future.done():
+            future.set_result(response)
 
     async def handle_return(self, channel, body, envelope, properties):
         future = self._response_futures.get(properties.message_id, None)
