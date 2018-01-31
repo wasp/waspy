@@ -34,6 +34,7 @@ class Methods(Enum):
     HEAD = 'HEAD'
     PUBLISH = 'PUBLISH'  # NOT VALID HTTP METHOD
 
+
 async def _send_404(request):
     raise webtypes.ResponseError(status=404)
 
@@ -77,7 +78,7 @@ class Router:
     def get_handler_for_request(self, request):
         method = request.method
         path = request.path
-        route = path.lstrip('/').replace('/', '.')
+        route = path.strip('/')
         if method == Methods.OPTIONS and self.options_handler is not None:
             # Is this an OPTION and do we have a generic options handler?
             request._handler = self.options_handler
@@ -93,7 +94,7 @@ class Router:
         params = []
         raw_path_string = '/'
         try:
-            for portion in route.split('.'):
+            for portion in route.split('/'):
                 sub = d.get(portion, None)
                 if sub is None:  # must be an ID field
                     key = ID_KEY
@@ -134,7 +135,7 @@ class Router:
         if isinstance(method, str):
             method = Methods(method.upper())
         route = self._prefix + route
-        route = route.lstrip('/').replace('/', '.')
+        route = route.strip('/')
         if route not in self._static_routes:
             self._static_routes[route] = {}
         self._static_routes[route][method] = handler
@@ -144,11 +145,11 @@ class Router:
             method = Methods(method.upper())
 
         route = self._prefix + route
+        route = route.strip('/')
         self.urls.append((method, route))
-        route = route.replace('/', '.').lstrip('.')
         d = self._routes
         params = []
-        for portion in route.split('.'):
+        for portion in route.split('/'):
             if portion.startswith('{') and '}' in portion:
                 sections = portion.lstrip('{').split('}', maxsplit=1)
                 params.append(sections[0])

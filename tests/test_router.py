@@ -16,18 +16,19 @@ def router():
     router_.get('/multiple/{ids}/{in}/{a}/row', 8)
     router_.get('/foo/{fooid}:action', 9)
     router_.get('/foo/{fooid}:action2', 10)
+    router_.get('/trailing/', 11)
 
     with router_.prefix('/test'):
-        router_.get('/test', 11)
+        router_.get('/test', 12)
 
     with router_.prefix('/nest-1'):
         with router_.prefix('/nest-2'):
             with router_.prefix('/nest-3/{nest3id}'):
                 with router_.prefix('/nest-4'):
-                    router_.get('/nest-4-get', 4)
+                    router_.get('/nest-4-get', 13)
                     with router_.prefix('/nest-5'):
-                        router_.get('/nest-5-get', 5)
-                    router_.get('/nest-4-get-2', 42)
+                        router_.get('/nest-5-get', 14)
+                    router_.get('/nest-4-get-2', 15)
 
     # now wrap all handlers with nothing
     handler_gen = router_._get_and_wrap_routes()
@@ -53,10 +54,12 @@ def router():
     ('/multiple/_ids/_in/_a/row', 8, ['ids', 'in', 'a']),
     ('/foo/_fooid:action', 9, ['fooid']),
     ('/foo/_fooid:action2', 10, ['fooid']),
-    ('/test/test', 11, []),
-    ('/nest-1/nest-2/nest-3/_nest3id/nest-4/nest-4-get', 4, ['nest3id']),
-    ('/nest-1/nest-2/nest-3/_nest3id/nest-4/nest-4-get-2', 42, ['nest3id']),
-    ('/nest-1/nest-2/nest-3/_nest3id/nest-4/nest-5/nest-5-get', 5, ['nest3id'])
+    ('/trailing/', 11, []),
+    ('/trailing', 11, []),
+    ('/test/test', 12, []),
+    ('/nest-1/nest-2/nest-3/_nest3id/nest-4/nest-4-get', 13, ['nest3id']),
+    ('/nest-1/nest-2/nest-3/_nest3id/nest-4/nest-5/nest-5-get', 14, ['nest3id']),
+    ('/nest-1/nest-2/nest-3/_nest3id/nest-4/nest-4-get-2', 15, ['nest3id']),
 ])
 def test_get_handler(path, expected_handler, expected_params, router):
     # Set up dummy request
@@ -82,22 +85,24 @@ def test_duplicate_handler():
 
     router_.get('/test/path/{param}', 5)
 
+
 def test_urls(router):
     urls = [
-        (Methods.GET, '/single'),
-        (Methods.GET, '/double/double'),
-        (Methods.GET, '/something/static/and/long'),
-        (Methods.GET, '/single/{id}'),
-        (Methods.GET, '/foo/{fooid}/bar/{barid}'),
-        (Methods.GET, '/foo/{fooid}/bar'),
-        (Methods.GET, '/foo/bar/baz/{id}'),
-        (Methods.GET, '/multiple/{ids}/{in}/{a}/row'),
-        (Methods.GET, '/foo/{fooid}:action'),
-        (Methods.GET, '/foo/{fooid}:action2'),
-        (Methods.GET, '/test/test'),
-        (Methods.GET, '/nest-1/nest-2/nest-3/{nest3id}/nest-4/nest-4-get'),
-        (Methods.GET, '/nest-1/nest-2/nest-3/{nest3id}/nest-4/nest-5/nest-5-get'),
-        (Methods.GET, '/nest-1/nest-2/nest-3/{nest3id}/nest-4/nest-4-get-2')
+        (Methods.GET, 'single'),
+        (Methods.GET, 'double/double'),
+        (Methods.GET, 'something/static/and/long'),
+        (Methods.GET, 'single/{id}'),
+        (Methods.GET, 'foo/{fooid}/bar/{barid}'),
+        (Methods.GET, 'foo/{fooid}/bar'),
+        (Methods.GET, 'foo/bar/baz/{id}'),
+        (Methods.GET, 'multiple/{ids}/{in}/{a}/row'),
+        (Methods.GET, 'foo/{fooid}:action'),
+        (Methods.GET, 'foo/{fooid}:action2'),
+        (Methods.GET, 'trailing'),
+        (Methods.GET, 'test/test'),
+        (Methods.GET, 'nest-1/nest-2/nest-3/{nest3id}/nest-4/nest-4-get'),
+        (Methods.GET, 'nest-1/nest-2/nest-3/{nest3id}/nest-4/nest-5/nest-5-get'),
+        (Methods.GET, 'nest-1/nest-2/nest-3/{nest3id}/nest-4/nest-4-get-2'),
     ]
     for idx, url in enumerate(urls):
         assert url == router.urls[idx]

@@ -1,6 +1,7 @@
 import asyncio
 import traceback
 import logging
+import urllib.parse
 from http import HTTPStatus
 
 from httptools import HttpRequestParser, HttpResponseParser, HttpParserError, \
@@ -86,7 +87,6 @@ class HTTPClientTransport(ClientTransportABC):
                            headers=None, correlation_id=None,
                            content_type=None, port=80, **kwargs):
         # form request object
-        path = path.replace('.', '/')
         if not path.startswith('/'):
             path = '/' + path
         if headers is None:
@@ -283,10 +283,12 @@ class _HTTPServerProtocol(asyncio.Protocol):
         self._task = task
 
     def on_url(self, url):
+        url = url.replace(b'//', b'/')
         url = parse_url(url)
         if url.query:
+            # query = urllib.parse.unquote(url.query.decode('latin-1'))
             self.request.query_string = url.query.decode('latin-1')
-        path = url.path.decode('latin-1')
+        path = urllib.parse.unquote(url.path.decode('latin-1'))
         if path.startswith(self._parent.prefix):
             path = path[len(self._parent.prefix):]
         self.request.path = path

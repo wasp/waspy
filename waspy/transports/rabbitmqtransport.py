@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import urllib.parse
 import uuid
 
 import aioamqp
@@ -201,7 +202,14 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             raise self._starting_future.exception()
         if correlation_id is None:
             correlation_id = str(uuid.uuid4())
+
+        # need to use `?` to represent `.` in rabbit
+        # since its not valid in a path, it should work correctly everywhere
+        path = path.replace('.', '?')
+
+        # now turn slashes into dots for rabbit style paths
         path = path.replace('/', '.').lstrip('.')
+
         if method != 'PUBLISH':
             path = f'{method.lower()}.' + path
 
@@ -411,12 +419,19 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         message_id = properties.message_id
         reply_to = properties.reply_to
         route = envelope.routing_key
+
         method, path = route.split('.', 1)
         try:
             method = Methods(method.upper())
         except ValueError:
-            path = f'{method}.{path}'
+            path = route
             method = 'POST'
+
+        path.replace('.', '/')
+        # need to use `?` to represent `.` in rabbit
+        # since its not valid in a path, it should work correctly everywhere
+        path.replace('?', '.')
+        path = urllib.parse.unquote(route)
 
         request = Request(
             headers=headers,
@@ -494,6 +509,8 @@ def parse_url_to_topic(method, route):
 
     However, once it hits the service the router will be able to distinguish the two requests.
     """
-    route = route.replace('/', '.').lstrip('.')
+    route = route.replace('.', '?')
+    route = route.replace('/', '.').strip('.')
     topic = f'{method.value.lower()}.{route}'
+    # need to replace `{id}` and `{id}:some_method` with just `*`
     return re.sub(r"\.\{[^\}]*\}[:\w\d_-]*", ".*", topic)
