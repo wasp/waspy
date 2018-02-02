@@ -153,7 +153,7 @@ class RabbitChannelMixIn:
                 password=self.password,
                 ssl=self.ssl,
                 verify_ssl=self.verify_ssl,
-                heartbeat=20,
+                heartbeat=self.heartbeat,
                 on_error=self._handle_rabbit_error,
                 loop=loop
             )
@@ -164,7 +164,7 @@ class RabbitChannelMixIn:
 class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
     def __init__(self, *, url=None, port=5672, virtualhost='/',
                  username='guest', password='guest',
-                 ssl=False, verify_ssl=True):
+                 ssl=False, verify_ssl=True, heartbeat=20):
 
         self._transport = None
         self._protocol = None
@@ -181,6 +181,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         self._consumer_tag = None
         self._closing = False
         self.channel = None
+        self.heartbeat = heartbeat
 
         if not url:
             raise TypeError("RabbitMqClientTransport() missing 1 required keyword-only argument: 'url'")
@@ -297,7 +298,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
     def __init__(self, *, url, port=5672, queue='', virtualhost='/',
                  username='guest', password='guest',
                  ssl=False, verify_ssl=True, create_queue=True,
-                 use_acks=False):
+                 use_acks=False, heartbeat=20):
         self.host = url
         self.port = port
         self.virtualhost = virtualhost
@@ -320,6 +321,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         self._closing = False
         self._client = None
         self._starting_future = None
+        self.heartbeat = heartbeat
 
     def get_client(self):
         if not self._client:
