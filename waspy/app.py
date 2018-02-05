@@ -56,6 +56,8 @@ class Application:
         if transport is None:
             from waspy.transports.httptransport import HTTPTransport
             transport = HTTPTransport()
+        if isinstance(transport, list):   
+            transport = tuple(transport)
         if not isinstance(transport, tuple):
             transport = (transport,)
         if middlewares is None:
