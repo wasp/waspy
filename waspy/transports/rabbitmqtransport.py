@@ -248,7 +248,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             return await future
 
     async def _bootstrap_channel(self, channel: Channel):
-        if self.channel and self.channel.open():
+        if self.channel and await self.channel.open():
             await self.channel.close()
         self.channel = channel
         await self.channel.queue_declare(queue_name=self.response_queue_name,
