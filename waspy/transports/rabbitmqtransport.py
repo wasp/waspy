@@ -429,10 +429,10 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
             path = route
             method = 'POST'
 
-        path.replace('.', '/')
+        path = path.replace('.', '/')
         # need to use `?` to represent `.` in rabbit
         # since its not valid in a path, it should work correctly everywhere
-        path.replace('?', '.')
+        path = path.replace('?', '.')
         path = urllib.parse.unquote(route)
 
         request = Request(
