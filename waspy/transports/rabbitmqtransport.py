@@ -433,7 +433,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         # need to use `?` to represent `.` in rabbit
         # since its not valid in a path, it should work correctly everywhere
         path = path.replace('?', '.')
-        path = urllib.parse.unquote(route)
+        path = urllib.parse.unquote(path)
 
         request = Request(
             headers=headers,
