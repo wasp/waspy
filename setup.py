@@ -8,7 +8,7 @@ except(IOError, ImportError):
 
 setup(
     name='waspy',
-    version='0.34.3',
+    version='0.34.4',
     install_requires=[
         'httptools==0.0.10',
         'aioamqp==0.10.0',
@@ -33,5 +33,3 @@ setup(
     ],
     keywords='wasp async asyncio curio rest framework rabbitmq microservices'
 )
-
-

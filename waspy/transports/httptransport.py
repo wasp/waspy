@@ -107,7 +107,8 @@ class HTTPClientTransport(ClientTransportABC):
         if query:
             path += '?' + query
         if content_type:
-            headers['Content-Type'] = content_type
+            if body:  # dont include content-type if there is no body
+                headers['Content-Type'] = content_type
         headers.pop('content-type', None)
         headers.pop('content-length', None)
         headers.pop('Content-Length', None)
