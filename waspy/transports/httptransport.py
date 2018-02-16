@@ -29,8 +29,15 @@ class _HTTPClientConnection:
         self._done = False
 
     async def connect(self, service, port, use_ssl):
-        self.reader, self.writer = await \
-            asyncio.open_connection(service, port, ssl=use_ssl)
+        for _ in range(3):
+            try:
+                self.reader, self.writer = await \
+                    asyncio.open_connection(service, port, ssl=use_ssl)
+                return
+            except ConnectionRefusedError:
+                """ connection refused. Try again """
+        raise ConnectionRefusedError(
+            f'Connection refused to "{service}" on port {port}')
 
     def send(self, method, path, headers, body):
         self.writer.write(f'{method.upper()} {path} HTTP/1.0\r\n'
@@ -80,12 +87,21 @@ class _HTTPClientConnection:
 
 class HTTPClientTransport(ClientTransportABC):
     """Client implementation of the HTTP transport protocol"""
+
     def _get_connection_for_service(self, service):
         pass
 
-    async def make_request(self, service, method, path, body=None, query=None,
-                           headers=None, correlation_id=None,
-                           content_type=None, port=80, **kwargs):
+    async def make_request(self,
+                           service,
+                           method,
+                           path,
+                           body=None,
+                           query=None,
+                           headers=None,
+                           correlation_id=None,
+                           content_type=None,
+                           port=80,
+                           **kwargs):
         # form request object
         if not path.startswith('/'):
             path = '/' + path
@@ -133,7 +149,10 @@ class HTTPTransport(TransportABC):
     def get_client(self):
         return HTTPClientTransport()
 
-    def __init__(self, port=8080, prefix=None, shutdown_grace_period=5,
+    def __init__(self,
+                 port=8080,
+                 prefix=None,
+                 shutdown_grace_period=5,
                  shutdown_wait_period=1):
         """
          HTTP Transport for listening on http
@@ -229,6 +248,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
         self._task: asyncio.Task = None
 
     """ The next 3 methods are for asyncio.Protocol handling """
+
     def connection_made(self, transport):
         self._transport = transport
         self._parent._connections.add(self)
@@ -246,13 +266,18 @@ class _HTTPServerProtocol(asyncio.Protocol):
             traceback.print_exc()
             logger.error('Bad http: %s', self.request)
             if self._transport:
-                self.send_response(Response(status=400,
-                                            body={'reason': 'Invalid HTTP',
-                                                  'details': str(e)}))
+                self.send_response(
+                    Response(
+                        status=400,
+                        body={
+                            'reason': 'Invalid HTTP',
+                            'details': str(e)
+                        }))
 
     """ 
     The following methods are for HTTP parsing (from httptools)
     """
+
     def on_message_begin(self):
         self.request = Request()
         self.data = b''
@@ -278,8 +303,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
     def on_message_complete(self):
         self.request.body = self.data
         task = self._loop.create_task(
-            self._parent.handle_incoming_request(self.request)
-        )
+            self._parent.handle_incoming_request(self.request))
         task.add_done_callback(self.handle_response)
         self._task = task
 
@@ -304,8 +328,9 @@ class _HTTPServerProtocol(asyncio.Protocol):
         except Exception:
             traceback.print_exc()
             self.send_response(
-                Response(status=500,
-                         body={'reason': 'Something really bad happened'}))
+                Response(
+                    status=500,
+                    body={'reason': 'Something really bad happened'}))
 
     def send_response(self, response):
         if response is None:
@@ -325,8 +350,8 @@ class _HTTPServerProtocol(asyncio.Protocol):
         if response.data:
             headers += 'Content-Type: {}\r\n'.format(response.content_type)
             headers += 'Content-Length: {}\r\n'.format(len(response.data))
-            if ('transfer-encoding' in response.headers or
-                        'Transfer-Encoding' in response.headers):
+            if ('transfer-encoding' in response.headers
+                    or 'Transfer-Encoding' in response.headers):
                 print('Httptoolstransport currently doesnt support '
                       'chunked mode, attempting without.')
                 response.headers.pop('transfer-encoding', None)
@@ -336,8 +361,8 @@ class _HTTPServerProtocol(asyncio.Protocol):
         for header, value in response.headers.items():
             if header in ('Content-Length', 'content-lenth'):
                 continue
-            headers += '{header}: {value}\r\n'.format(header=header,
-                                                      value=value)
+            headers += '{header}: {value}\r\n'.format(
+                header=header, value=value)
 
         result = headers.encode('latin-1') + b'\r\n'
         if response.data:
@@ -347,7 +372,8 @@ class _HTTPServerProtocol(asyncio.Protocol):
             self._transport.write(result)
         except AttributeError:
             # "NoneType has no attribute 'write'" because transport is closed
-            logger.debug('Connection closed prematurely, most likely by client')
+            logger.debug(
+                'Connection closed prematurely, most likely by client')
         self.request = 0
         self.data = 0
 

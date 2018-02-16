@@ -2,7 +2,6 @@
 A place for abstract transport base classes
 """
 from abc import ABC, abstractmethod
-from ..router import Router
 from .. import webtypes
 
 
@@ -35,6 +34,10 @@ class ClientTransportABC(ABC):
         """
 
 
+class PubSubTransportABC(ABC):
+    """ Abstract Base Class for implementing pubsub client transports"""
+
+
 class TransportABC(ABC):
     """ Abstract Base Class for implementing server transports"""
     @abstractmethod
@@ -58,3 +61,10 @@ class TransportABC(ABC):
     @abstractmethod
     def shutdown(self):
         """ Signals that we are shutting down """
+
+
+class WorkerTransportABC(ABC):
+    """ Abstract Base Class for implementing worker transports """
+    @abstractmethod
+    def start(self):
+        pass

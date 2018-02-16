@@ -7,7 +7,7 @@ import aioamqp
 import re
 from aioamqp import channel
 
-from .transportabc import TransportABC, ClientTransportABC
+from .transportabc import TransportABC, ClientTransportABC, WorkerTransportABC
 from ..webtypes import Request, Response, Methods, NotRoutableError
 
 
@@ -516,3 +516,19 @@ def parse_url_to_topic(method, route):
     topic = f'{method.value.lower()}.{route}'
     # need to replace `{id}` and `{id}:some_method` with just `*`
     return re.sub(r"\.\{[^\}]*\}[:\w\d_-]*", ".*", topic)
+
+
+class RabbitMQWorkerTransport(RabbitMQTransport, WorkerTransportABC):
+    def __init__(self, *, url, port=5672, queue='', virtualhost='/',
+                 username='guest', password='guest',
+                 ssl=False, verify_ssl=True, create_queue=True, heartbeat=20):
+        super().__init__(url=url, port=port, queue=queue,
+                         virtualhost=virtualhost, username=username,
+                         password=password, ssl=ssl, verify_ssl=verify_ssl,
+                         create_queue=create_queue, use_acks=True,
+                         heartbeat=heartbeat)
+        self._worker = None
+
+    def start(self, worker):
+        print(f"-- Listening for rabbitmq messages on queue {self.queue} --")
+        self._worker = worker
