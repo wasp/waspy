@@ -341,11 +341,12 @@ class _HTTPServerProtocol(asyncio.Protocol):
             status_code=response.status.value,
             status_message=response.status.phrase,
         )
-        if self._parent.shutting_down:
-            headers += 'Connection: close\r\n'
-        else:
-            headers += 'Connection: keep-alive\r\n'
-            headers += 'Keep-Alive: timeout=5, max=50\r\n'
+        headers += 'Connection: close\r\n'
+        # if self._parent.shutting_down:
+            # headers += 'Connection: close\r\n'
+        # else:
+            # headers += 'Connection: keep-alive\r\n'
+            # headers += 'Keep-Alive: timeout=5, max=50\r\n'
 
         if response.data:
             headers += 'Content-Type: {}\r\n'.format(response.content_type)
