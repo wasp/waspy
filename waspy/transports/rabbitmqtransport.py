@@ -162,6 +162,7 @@ class RabbitChannelMixIn:
 
 
 class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
+    _CLOSING_SENTINAL = object()
     def __init__(self, *, url=None, port=5672, virtualhost='/',
                  username='guest', password='guest',
                  ssl=False, verify_ssl=True, heartbeat=20):
@@ -182,11 +183,26 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         self._closing = False
         self.channel = None
         self.heartbeat = heartbeat
+        self._sending_queue = asyncio.Queue()
+        self._background_sender = self._send_messages_in_backround()
 
         if not url:
             raise TypeError("RabbitMqClientTransport() missing 1 required keyword-only argument: 'url'")
 
+        asyncio.ensure_future(self._background_sender)
         self._starting_future: asyncio.Future = asyncio.ensure_future(self.connect())
+
+    async def _send_messages_in_backround(self):
+        while True:
+            message = await self._sending_queue.get()
+
+            if message is self._CLOSING_SENTINAL:
+                return
+
+            if not self._starting_future.done():
+                await self._starting_future
+
+            self.channel.basic_publish(**message)
 
     async def make_request(self, service: str, method: str, path: str,
                            body: bytes = None, query: str = None,
@@ -236,11 +252,12 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         if content_type:
             properties['content_type'] = content_type
 
-        await self.channel.basic_publish(exchange_name=exchange,
-                                         routing_key=path,
-                                         properties=properties,
-                                         payload=body,
-                                         mandatory=mandatory)
+        await self._sending_queue.put(
+            dict(exchange_name=exchange,
+                 routing_key=path,
+                 properties=properties,
+                 payload=body,
+                 mandatory=mandatory))
 
         if method != 'PUBLISH':
             future = asyncio.Future()
@@ -287,9 +304,10 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             logger.error(f'Got a return with an unknown reply code: '
                          f'{envelope.reply_code}')
 
-
     async def close(self):
         self._closing = True
+        await self._sending_queue.put(self._CLOSING_SENTINAL)
+        await self._background_sender
         await self._protocol.close()
         self._transport.close()
 
