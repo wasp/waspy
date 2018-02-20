@@ -131,12 +131,14 @@ class RabbitChannelMixIn:
         try:
             raise exception
         except (aioamqp.ChannelClosed, aioamqp.AmqpClosedConnection):
+            logger.exception("Rabbitmq channel closed")
             if not self._closing:
                 self._starting_future = asyncio.ensure_future(self.connect())
 
     async def connect(self, loop=None):
         if self.channel and self.channel.is_open:
             return
+        logger.warning('Establishing new connection')
         channel = None
         if self._protocol and not self._protocol.connection_closed.is_set():
             try:  # getting a new channel from existing protocol
@@ -202,7 +204,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             if not self._starting_future.done():
                 await self._starting_future
 
-            self.channel.basic_publish(**message)
+            await self.channel.basic_publish(**message)
 
     async def make_request(self, service: str, method: str, path: str,
                            body: bytes = None, query: str = None,
