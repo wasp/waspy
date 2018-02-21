@@ -18,7 +18,11 @@ logger = logging.getLogger("waspy")
 
 So... on that note: Lets do some monkey patching!!
 We need to support mandatory bit, and handle returned messages, but
-aioamqp doesnt support it yet. (follow https://github.com/Polyconseil/aioamqp/pull/158)
+aioamqp doesnt support it yet. 
+(follow https://github.com/Polyconseil/aioamqp/pull/158)
+
+monkey patching _write_frame_awaiting_response fixes a waiter error. 
+(follow PR here: https://github.com/Polyconseil/aioamqp/pull/159)
 
 """
 import io
@@ -101,7 +105,32 @@ async def dispatch_frame(self, frame):
         raise NotImplementedError("Frame (%s, %s) is not implemented" % (frame.class_id, frame.method_id))
     await methods[(frame.class_id, frame.method_id)](frame)
 
+async def _write_frame_awaiting_response(self, waiter_id, frame, request,
+                                         no_wait, check_open=True, drain=True):
+    '''Write a frame and set a waiter for
+    the response (unless no_wait is set)'''
+    if no_wait:
+        await self._write_frame(frame, request, check_open=check_open,
+                                     drain=drain)
+        return None
 
+    f = self._set_waiter(waiter_id)
+    try:
+        await self._write_frame(frame, request, check_open=check_open,
+                                     drain=drain)
+    except Exception:
+        self._get_waiter(waiter_id)
+        f.cancel()
+        raise
+    result = await f
+    try:
+        self._get_waiter(waiter_id)
+    except aioamqp.SynchronizationError:
+        # no waiter to get
+        pass
+    return result
+
+channel.Channel._write_frame_awaiting_response = _write_frame_awaiting_response
 channel.Channel.dispatch_frame = dispatch_frame
 channel.Channel.basic_return = basic_return
 
@@ -186,29 +215,21 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         self.channel = None
         self.heartbeat = heartbeat
         self._sending_queue = asyncio.Queue()
-        self._background_sender = self._send_messages_in_backround()
 
         if not url:
             raise TypeError("RabbitMqClientTransport() missing 1 required keyword-only argument: 'url'")
 
-        asyncio.ensure_future(self._background_sender)
-        self._starting_future: asyncio.Future = asyncio.ensure_future(self.connect())
+        self._starting_future: asyncio.Future = asyncio.ensure_future(
+            self.connect())
 
-    async def _send_messages_in_backround(self):
-        while True:
-            message = await self._sending_queue.get()
-
-            if message is self._CLOSING_SENTINAL:
-                return
-
-            if not self._starting_future.done():
-                await self._starting_future
-
-            await self.channel.basic_publish(**message)
-
-    async def make_request(self, service: str, method: str, path: str,
-                           body: bytes = None, query: str = None,
-                           headers: dict = None, correlation_id: str = None,
+    async def make_request(self,
+                           service: str,
+                           method: str,
+                           path: str,
+                           body: bytes = None,
+                           query: str = None,
+                           headers: dict = None,
+                           correlation_id: str = None,
                            content_type: str = None,
                            exchange: str = 'amq.topic',
                            timeout: int = 30,
@@ -219,6 +240,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             await self._starting_future
         if self._starting_future.exception():
             raise self._starting_future.exception()
+
         if correlation_id is None:
             correlation_id = str(uuid.uuid4())
 
@@ -254,12 +276,11 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         if content_type:
             properties['content_type'] = content_type
 
-        await self._sending_queue.put(
-            dict(exchange_name=exchange,
-                 routing_key=path,
-                 properties=properties,
-                 payload=body,
-                 mandatory=mandatory))
+        await self.channel.basic_publish(exchange_name=exchange,
+                                         routing_key=path,
+                                         properties=properties,
+                                         payload=body,
+                                         mandatory=mandatory)
 
         if method != 'PUBLISH':
             future = asyncio.Future()
@@ -267,6 +288,8 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             return await future
 
     async def _bootstrap_channel(self, channel: Channel):
+        if self.channel == channel:
+            logger.warning("somehow the channels are the same on a bootstrap")
         if self.channel and self.channel.is_open:
             await self.channel.close()
         self.channel = channel
@@ -275,10 +298,15 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
                                          exclusive=False,
                                          auto_delete=True)
         self.channel.return_callback = self.handle_return
-        self._consumer_tag = (await self.channel.basic_consume(
-            self.handle_responses,
-            queue_name=self.response_queue_name,
-            no_ack=True)).get('consumer_tag')
+        try:
+            self._consumer_tag = (await self.channel.basic_consume(
+                self.handle_responses,
+                queue_name=self.response_queue_name,
+                no_ack=True)).get('consumer_tag')
+        except aioamqp.SynchronizationError as e:
+            logger.exception('Channel already consuming')
+            raise
+
 
     async def handle_responses(self, channel, body, envelope, properties):
         future = self._response_futures[properties.message_id]
