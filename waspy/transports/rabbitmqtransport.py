@@ -189,7 +189,10 @@ class RabbitChannelMixIn:
                 loop=loop
             )
             channel = await self._protocol.channel()
-        await self._bootstrap_channel(channel)
+        try:
+            await self._bootstrap_channel(channel)
+        except aioamqp.ChannelClosed:
+            await self.connect(loop=loop)
 
 
 class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
@@ -306,7 +309,6 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         except aioamqp.SynchronizationError as e:
             logger.exception('Channel already consuming')
             raise
-
 
     async def handle_responses(self, channel, body, envelope, properties):
         future = self._response_futures[properties.message_id]

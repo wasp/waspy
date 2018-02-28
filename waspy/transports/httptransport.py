@@ -105,6 +105,7 @@ class HTTPClientTransport(ClientTransportABC):
         # form request object
         if not path.startswith('/'):
             path = '/' + path
+        path = path.replace(' ', '+')
         if headers is None:
             headers = {}
         use_ssl = service.startswith('https://') or port == 443
