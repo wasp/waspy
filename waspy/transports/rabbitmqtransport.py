@@ -176,6 +176,17 @@ class RabbitChannelMixIn:
                 # ok, that didnt work
                 channel = None
         if not channel:
+            if os.getenv('DEBUG', 'false') == 'true':
+                print(dict(host=self.host,
+                           port=self.port,
+                           virtualhost=self.virtualhost,
+                           login=self.username,
+                           password=self.password,
+                           ssl=self.ssl,
+                           verify_ssl=self.verify_ssl,
+                           heartbeat=self.heartbeat,
+                           on_error=self._handle_rabbit_error,
+                           loop=loop))
             self._transport, self._protocol = await aioamqp.connect(
                 host=self.host,
                 port=self.port,
