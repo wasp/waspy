@@ -2,6 +2,7 @@ import asyncio
 import logging
 import urllib.parse
 import uuid
+import os
 
 import aioamqp
 import re
