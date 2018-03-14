@@ -177,6 +177,10 @@ class RabbitChannelMixIn:
                 # ok, that didnt work
                 channel = None
         if not channel:
+            try:
+                self._protocol.close()
+            except:
+                pass
             if os.getenv('DEBUG', 'false') == 'true':
                 print(dict(host=self.host,
                            port=self.port,
