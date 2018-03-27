@@ -13,8 +13,10 @@ from aioamqp.channel import Channel
 
 
 from .transportabc import TransportABC, ClientTransportABC, WorkerTransportABC
-from ..webtypes import Request, Response, Methods, NotRoutableError
+from ..webtypes import Request, Response, Methods
+from ..exceptions import NotRoutableError
 from waspy.listeners.transport_listener_abc import TransportListenerABC
+
 
 logger = logging.getLogger("waspy")
 

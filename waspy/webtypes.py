@@ -1,7 +1,11 @@
 import json
+import warnings
 from collections import defaultdict
 from urllib import parse
 from aenum import extend_enum
+
+from waspy import exceptions
+from waspy.parser import parsers
 from .router import Methods
 from http import HTTPStatus, cookies
 
@@ -58,7 +62,7 @@ class Request:
     def __init__(self, headers: dict = None,
                  path: str = None, correlation_id: str = None,
                  method: str = None, query_string: str = None,
-                 body: bytes=None, content_type='application/json'):
+                 body: bytes=None, content_type=None):
 
         if not headers:
             headers = {}
@@ -75,8 +79,9 @@ class Request:
         self.path_params = {}
         self._handler = None
         self.app = None
+        self.parser = None
         self.content_type = content_type
-        self._json = None
+        self._data = None
         self._cookies = None
 
     @property
@@ -113,13 +118,20 @@ class Request:
         return self._query_params
 
     def json(self) -> dict:
-        if not self._json:
-            # convert body into a json dict
-            try:
-                self._json = json.loads(self.body.decode())
-            except json.JSONDecodeError as ex:
-                raise JSONDecodeError from ex
-        return self._json
+        warnings.warn('Use request.data() instead')
+        return self.data()
+
+    def data(self) -> dict:
+        if not self._data:
+            if not self.parser:
+                if not self.content_type:
+                    self.content_type = self.app.default_content_type
+                self.parser = parsers.get(self.content_type)
+                if not self.parser:
+                    raise exceptions.UnsupportedMediaType(self.content_type)
+            # convert body into a dict using the matching content_type
+            self._data = self.parser.decode(self.body)
+        return self._data
 
     def __str__(self):
         query = '?' + self.query_string if self.query_string else ''
@@ -137,7 +149,7 @@ class Request:
 class Response:
     def __init__(self, headers=None, correlation_id=None,
                  body=None, status=HTTPStatus.OK,
-                 content_type='application/json', meta: dict=None):
+                 content_type=None, meta: dict=None):
         """
         Response object
         :param headers:
@@ -160,6 +172,8 @@ class Response:
         self.status = status
         self.content_type = content_type
         self.meta = meta
+        self.app = None
+        self.parser = None
         self._data = None
         self._json = None
 
@@ -170,11 +184,13 @@ class Response:
     @property
     def data(self):
         if self._data is None and self.body:
-            if (self.content_type == 'application/json' and
-                    isinstance(self.body, dict)):
-                self._data = json.dumps(self.body)
-            else:
-                self._data = self.body
+            if not self.parser:
+                if not self.content_type and self.app.default_content_type:
+                    self.content_type = self.app.default_content_type
+                self.parser = parsers.get(self.content_type)
+                if not self.parser:
+                    raise exceptions.UnsupportedMediaType(self.content_type)
+            self._data = self.parser.encode(self.body)
             if isinstance(self._data, str):
                 self._data = self._data.encode()
         return self._data
@@ -185,40 +201,8 @@ class Response:
         """
         if self.body is None:
             self._json = {}
-        elif not self._json:
-            # convert body into a json dict
-            try:
-                self._json = json.loads(self.body.decode())
-            except json.JSONDecodeError as ex:
-                raise JSONDecodeError from ex
+        try:
+            self._json = json.loads(self.body.decode())
+        except json.JSONDecodeError as ex:
+            raise exceptions.ParseError("Invalid JSON") from ex
         return self._json
-
-
-class ResponseError(Exception):
-    def __init__(self, message=None, status=None, *, body=None, headers=None,
-                 correlation_id=None, reason=None, log=False):
-        super().__init__(message)
-        self.message = message
-        if hasattr(self, 'status') and status is None:
-            status = self.status
-        if hasattr(self, 'body') and body is None:
-            body = self.body
-        if hasattr(self, 'reason') and reason is None:
-            reason = self.reason
-        if hasattr(self, 'log') and log == False:
-            log = self.log
-        if reason and not body:
-            body = {'reason': reason}
-        self.response = Response(status=status, body=body, headers=headers,
-                                 correlation_id=correlation_id)
-        self.log = log
-
-
-class JSONDecodeError(ResponseError):
-    status = 400
-    reason = 'Invalid Json'
-
-
-class NotRoutableError(ResponseError):
-    status = 404
-    reason = 'No route found'

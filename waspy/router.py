@@ -1,4 +1,3 @@
-import re
 import warnings
 
 from contextlib import contextmanager
@@ -7,7 +6,7 @@ from typing import Callable, Union
 
 from enum import Enum
 
-from waspy import webtypes
+from .exceptions import ResponseError
 
 """
 The below constant is special key in the router dictionary that determines an
@@ -37,11 +36,11 @@ class Methods(Enum):
 
 
 async def _send_404(request):
-    raise webtypes.ResponseError(status=HTTPStatus.NOT_FOUND)
+    raise ResponseError(status=HTTPStatus.NOT_FOUND)
 
 
 async def _send_405(request):
-    raise webtypes.ResponseError(status=HTTPStatus.METHOD_NOT_ALLOWED)
+    raise ResponseError(status=HTTPStatus.METHOD_NOT_ALLOWED)
 
 
 class Router:

@@ -7,9 +7,11 @@ from typing import List, Union, Iterable
 from http import HTTPStatus
 from concurrent.futures import CancelledError
 
+from waspy.parser import ParserABC, JSONParser, parsers as app_parsers
 from ._cors import CORSHandler
 from .client import Client
-from .webtypes import Request, Response, ResponseError
+from .webtypes import Request, Response
+from .exceptions import ResponseError, UnsupportedMediaType
 from .router import Router
 from .transports.transportabc import TransportABC
 from .transports.rabbitmqtransport import NackMePleaseError
@@ -52,7 +54,9 @@ class Application:
                  debug: bool=False,
                  router: Router=None,
                  config: Config=None,
-                 loop=None):
+                 loop=None,
+                 parsers=None,
+                 default_content_type='application/json'):
         if transport is None:
             from waspy.transports.httptransport import HTTPTransport
             transport = HTTPTransport()
@@ -70,6 +74,13 @@ class Application:
             default_headers = {'Server': 'waspy'}
         if not config:
             config = Config()
+
+        # Parser management
+        if not parsers:
+            parsers = [JSONParser()]
+        for parser in parsers:
+            self.add_parser(parser)
+
         self.transport = transport
         self.middlewares = middlewares
         self.default_headers = default_headers
@@ -83,12 +94,16 @@ class Application:
         self.logger = None
         self._cors_handler = None
         self.loop = loop
+        self.default_content_type = default_content_type
 
     @property
     def client(self) -> Client:
         if not self._client:
             self._client = Client(transport=self.transport[0].get_client())
         return self._client
+
+    def add_parser(self, parser: ParserABC):
+        app_parsers[parser.content_type] = parser
 
     def start_shutdown(self, signum=None, frame=None):
         # loop = asyncio.get_event_loop()
@@ -148,7 +163,6 @@ class Application:
         logger.debug("Running on stop hooks")
         await self._run_hooks(self.on_stop)
 
-
     async def handle_request(self, request: Request) -> Response:
         """
         coroutine: This method is called by Transport
@@ -161,9 +175,18 @@ class Application:
                 handler = self.router.get_handler_for_request(request)
                 request.app = self
                 response = await handler(request)
-
+                response.app = self
             except ResponseError as r:
-                response = r.response
+                parser = app_parsers.get(request.content_type, None)
+                if not parser:
+                    content_type = self.default_content_type
+                else:
+                    content_type = request.content_type
+                response = Response(
+                    headers=r.headers, correlation_id=r.correlation_id, body=r.body,
+                    status=r.status, content_type=content_type
+                )
+                response.app = self
                 if r.log:
                     exc_info = sys.exc_info()
                     self.logger.log_exception(request, exc_info, level='warning')
@@ -184,6 +207,7 @@ class Application:
             self.logger.log_exception(request, exc_info)
             response = Response(status=500,
                                 body={'message': 'Server Error'})
+            response.app = self
         if not response.correlation_id:
             response.correlation_id = request.correlation_id
 

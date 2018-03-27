@@ -331,7 +331,9 @@ class _HTTPServerProtocol(asyncio.Protocol):
             self.send_response(
                 Response(
                     status=500,
-                    body={'reason': 'Something really bad happened'}))
+                    body={'reason': 'Something really bad happened'},
+                    content_type=self.request.app.default_content_type
+                ))
 
     def send_response(self, response):
         if response is None:
