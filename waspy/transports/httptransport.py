@@ -351,9 +351,9 @@ class _HTTPServerProtocol(asyncio.Protocol):
             # headers += 'Connection: keep-alive\r\n'
             # headers += 'Keep-Alive: timeout=5, max=50\r\n'
 
-        if response.data:
+        if response.raw_body:
             headers += 'Content-Type: {}\r\n'.format(response.content_type)
-            headers += 'Content-Length: {}\r\n'.format(len(response.data))
+            headers += 'Content-Length: {}\r\n'.format(len(response.raw_body))
             if ('transfer-encoding' in response.headers
                     or 'Transfer-Encoding' in response.headers):
                 print('Httptoolstransport currently doesnt support '
@@ -369,8 +369,8 @@ class _HTTPServerProtocol(asyncio.Protocol):
                 header=header, value=value)
 
         result = headers.encode('latin-1') + b'\r\n'
-        if response.data:
-            result += response.data
+        if response.raw_body:
+            result += response.raw_body
 
         try:
             self._transport.write(result)

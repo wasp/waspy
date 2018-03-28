@@ -22,7 +22,7 @@ def test_content_types(parsers, content_type, fail, monkeypatch):
         data = {'test': 'data'}
         r = Response(body=data, content_type=content_type)
         r.app = app
-        r.data
+        r.raw_body
     except UnsupportedMediaType:
         assert fail
     else:

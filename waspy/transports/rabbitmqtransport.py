@@ -443,7 +443,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         if reply_to:
             response.headers['Status'] = str(response.status.value)
 
-            payload = response.data or b'None'
+            payload = response.raw_body or b'None'
 
             properties = {
                 'correlation_id': response.correlation_id,
