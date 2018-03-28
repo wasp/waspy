@@ -94,8 +94,14 @@ class Parseable:
             # Transports sometimes set the value after the response is created
             # Setting it to the original_body allows for lazy parsing
             self.original_body = value
+            # Reset body and raw_body
+            self._raw_body = None
+            self._body = None
         elif isinstance(value, dict):
             self._body = value
+            # Reset the raw_body
+            self.original_body = value
+            self._raw_body = None
 
     @property
     def raw_body(self) -> bytes:
@@ -110,11 +116,6 @@ class Parseable:
             elif isinstance(self.original_body, bytes):
                 self._raw_body = self.original_body
         return self._raw_body
-
-    @raw_body.setter
-    def raw_body(self, value):
-        if isinstance(value, bytes):
-            self._raw_body = value
 
     def json(self) -> dict:
         """ Simply an alias now for getting the decoded body """

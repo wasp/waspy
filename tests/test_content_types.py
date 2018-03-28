@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -27,3 +28,23 @@ def test_content_types(parsers, content_type, fail, monkeypatch):
         assert fail
     else:
         assert not fail
+
+
+def test_body_raw_body(monkeypatch):
+    app = MagicMock()
+    app.default_content_type = 'application/json'
+    p = {'application/json': JSONParser()}
+    monkeypatch.setattr('waspy.webtypes.parsers', p)
+
+    # Test happy path
+    original_body = {'test': 'original'}
+    r = Response(body=original_body)
+    r.app = app
+    assert r.body == original_body
+    assert r.raw_body == json.dumps(original_body).encode()
+
+    # Test changing the body later
+    new_body = {'test': 'new body'}
+    r.body = new_body
+    assert r.body == new_body
+    assert r.raw_body == json.dumps(new_body).encode()
