@@ -178,6 +178,7 @@ class HTTPTransport(TransportABC):
         self.shutdown_grace_period = shutdown_grace_period
         self.shutdown_wait_period = shutdown_wait_period
         self.shutting_down = False
+        self._config = {}
 
     def listen(self, *, loop: asyncio.AbstractEventLoop, config):
         self._loop = loop

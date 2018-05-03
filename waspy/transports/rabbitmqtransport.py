@@ -106,6 +106,7 @@ async def dispatch_frame(self, frame):
         raise NotImplementedError("Frame (%s, %s) is not implemented" % (frame.class_id, frame.method_id))
     await methods[(frame.class_id, frame.method_id)](frame)
 
+
 async def _write_frame_awaiting_response(self, waiter_id, frame, request,
                                          no_wait, check_open=True, drain=True):
     '''Write a frame and set a waiter for
@@ -388,6 +389,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         self._client = None
         self._starting_future = None
         self.heartbeat = heartbeat
+        self._config = {}
 
     def get_client(self):
         if not self._client:
@@ -448,6 +450,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
 
     def listen(self, *, loop, config):
         self._starting_future = loop.create_task(self.connect(loop=loop))
+        self._config = config
 
         async def setup():
             if not self._starting_future.done():
@@ -515,6 +518,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         if properties.content_encoding:
             headers['content-encoding'] = properties.content_encoding
 
+        logger.debug('received invomind request via rabbitmq: %s', request)
         response = await self._handler(request)
         if response is None:
             # task got cancelled. Dont send a response.
