@@ -1,14 +1,13 @@
 from setuptools import setup
+from os import path
 
-try:
-    import pypandoc
-    long_description = pypandoc.convert('readme.md', 'rst')
-except(IOError, ImportError):
-    long_description = open('readme.md').read()
+here = path.abspath(path.dirname(__file__))
+with open(path.join(here, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
 
 setup(
     name='waspy',
-    version='0.36.7',
+    version='0.36.8',
     install_requires=[
         'httptools==0.0.10',
         'aioamqp==0.10.0',
@@ -17,6 +16,7 @@ setup(
     ],
     packages=['waspy', 'waspy.transports'],
     long_description=long_description,
+    long_desciption_comtent_type='text/markdown',
     url='https://github.com/wasp/waspy',
     license='Apache 2.0',
     author='nhumrich',
