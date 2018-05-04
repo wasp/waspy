@@ -379,6 +379,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
                 'Connection closed prematurely, most likely by client')
         self.request = 0
         self.data = 0
+        self.attempt_close()
 
     def attempt_close(self):
         if self.request == 0:
