@@ -154,6 +154,9 @@ def parse_rabbit_message(body, envelope, properties):
 
 
 class RabbitChannelMixIn:
+    def __init__(self):
+        self._channel_ready = asyncio.Event()
+
     async def _bootstrap_channel(self, channel):
         raise NotImplementedError
 
@@ -163,26 +166,22 @@ class RabbitChannelMixIn:
             raise exception
         except (aioamqp.ChannelClosed, aioamqp.AmqpClosedConnection):
             logger.exception("Rabbitmq channel closed")
-            if not self._closing:
-                self._starting_future = asyncio.ensure_future(self.connect())
+
+    async def disconnect(self):
+        await self._protocol.close()
+        self._transport.close()
 
     async def connect(self, loop=None):
-        if self.channel and self.channel.is_open:
-            return
-        logger.warning('Establishing new connection')
-        channel = None
-        if self._protocol and not self._protocol.connection_closed.is_set():
-            try:  # getting a new channel from existing protocol
-                channel = await self._protocol.channel()
-            except aioamqp.AioamqpException:
-                # ok, that didnt work
-                channel = None
-        if not channel:
-            try:
-                self._protocol.close()
-            except:
-                pass
+        async def do_connect():
+            if self.channel and self.channel.is_open:
+                return
+            logger.warning('Establishing new connection')
+            channel = None
+            if self._protocol:
+                await self.disconnect()
+
             if os.getenv('DEBUG', 'false') == 'true':
+                # todo: should make this use config, and not env vars
                 print(dict(host=self.host,
                            port=self.port,
                            virtualhost=self.virtualhost,
@@ -206,10 +205,23 @@ class RabbitChannelMixIn:
                 loop=loop
             )
             channel = await self._protocol.channel()
-        try:
+
             await self._bootstrap_channel(channel)
-        except aioamqp.ChannelClosed:
-            await self.connect(loop=loop)
+            self._channel_ready.set()
+
+        async def reconnect():
+            try:
+                while not self._closing:
+                    await do_connect()
+                    await self._protocol.wait_closed()
+                    self._channel_ready.clear()
+                    self.channel = None
+
+                    await self.disconnect()
+            finally:
+                await self.disconnect()
+
+        asyncio.ensure_future(reconnect())
 
 
 class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
@@ -234,13 +246,9 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         self._closing = False
         self.channel = None
         self.heartbeat = heartbeat
-        self._sending_queue = asyncio.Queue()
 
         if not url:
             raise TypeError("RabbitMqClientTransport() missing 1 required keyword-only argument: 'url'")
-
-        self._starting_future: asyncio.Future = asyncio.ensure_future(
-            self.connect())
 
     async def make_request(self,
                            service: str,
@@ -256,10 +264,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
                            mandatory: bool = False,
                            **kwargs):
 
-        if not self._starting_future.done():
-            await self._starting_future
-        if self._starting_future.exception():
-            raise self._starting_future.exception()
+        await self._channel_ready.wait()
 
         if correlation_id is None:
             correlation_id = str(uuid.uuid4())
@@ -355,10 +360,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
 
     async def close(self):
         self._closing = True
-        await self._sending_queue.put(self._CLOSING_SENTINAL)
-        await self._background_sender
-        await self._protocol.close()
-        self._transport.close()
+        await self.disconnect()
 
 
 class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
@@ -387,7 +389,6 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         self._done_future = asyncio.Future()
         self._closing = False
         self._client = None
-        self._starting_future = None
         self.heartbeat = heartbeat
         self._config = {}
 
@@ -428,13 +429,8 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
     async def start(self, handler):
         print(f"-- Listening for rabbitmq messages on queue {self.queue} --")
         self._handler = handler
-        # ToDo: Need to reconnect because of potential forking affects
-        # await self.close()
-        # await self.connect()
-        self._starting_future = asyncio.ensure_future(
-            self._bootstrap_channel(self.channel))
-        if not self._starting_future.done():
-            await self._starting_future
+
+        await self._channel_ready.wait()
 
         try:
             await self._done_future
@@ -449,14 +445,11 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
             await asyncio.sleep(1)
 
     def listen(self, *, loop, config):
-        self._starting_future = loop.create_task(self.connect(loop=loop))
+        loop.create_task(self.connect(loop=loop))
         self._config = config
 
         async def setup():
-            if not self._starting_future.done():
-                await self._starting_future
-            if self._starting_future.exception():
-                raise self._starting_future.exception()
+            await self._channel_ready.wait()
             if self.create_queue:
                 await self.channel.queue_declare(queue_name=self.queue)
 
@@ -464,15 +457,14 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
 
     async def close(self):
         self._closing = True
-        await self._protocol.close()
         if self._client:
             await self._client.close()
-        self._transport.close()
+        await self.disconnect()
 
     async def handle_request(self, channel: Channel, body, envelope,
                              properties, futurize=True):
         """
-        the 'f' param is simply because aioamqp doesnt send another job until
+        the 'futurize' param is simply because aioamqp doesnt send another job until
          this method returns (completes), so we ensure the future of
          ourselves and return immediately so we can handle many requests
          at a time.
@@ -535,10 +527,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
                 'message_id': message_id,
                 'expiration': '30000',
             }
-            if not self._starting_future.done:
-                await self._starting_future
-            if self._starting_future.exception():
-                raise self._starting_future.exception()
+            await self._channel_ready.wait()
             await channel.basic_publish(exchange_name='',
                                         payload=payload,
                                         routing_key=reply_to,
