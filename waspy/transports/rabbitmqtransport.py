@@ -230,6 +230,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
                  username='guest', password='guest',
                  ssl=False, verify_ssl=True, heartbeat=20):
 
+        super().__init__()
         self._transport = None
         self._protocol = None
         self._response_futures = {}
@@ -246,6 +247,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         self._closing = False
         self.channel = None
         self.heartbeat = heartbeat
+        self._connected = False
 
         if not url:
             raise TypeError("RabbitMqClientTransport() missing 1 required keyword-only argument: 'url'")
@@ -264,6 +266,9 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
                            mandatory: bool = False,
                            **kwargs):
 
+        if not self._connected:
+            self._connected = True
+            asyncio.ensure_future(self.connect())
         await self._channel_ready.wait()
 
         if correlation_id is None:
@@ -368,6 +373,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
                  username='guest', password='guest',
                  ssl=False, verify_ssl=True, create_queue=True,
                  use_acks=False, heartbeat=20):
+        super().__init__()
         self.host = url
         self.port = port
         self.virtualhost = virtualhost
