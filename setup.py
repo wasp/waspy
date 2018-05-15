@@ -7,7 +7,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='waspy',
-    version='0.37.2',
+    version='0.37.3',
     install_requires=[
         'httptools==0.0.10',
         'aioamqp==0.10.0',

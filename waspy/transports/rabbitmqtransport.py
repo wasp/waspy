@@ -548,9 +548,9 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
 
     async def _bootstrap_channel(self, channel):
         self.channel = channel
-        if self._handler is None:
+        while self._handler is None:
             # we havent started yet
-            return
+            await asyncio.sleep(1)
 
         await self.channel.basic_qos(prefetch_count=1)
         resp = await self.channel.basic_consume(
