@@ -168,8 +168,10 @@ class RabbitChannelMixIn:
             logger.exception("Rabbitmq channel closed")
 
     async def disconnect(self):
-        await self._protocol.close()
-        self._transport.close()
+        if self._protocol:
+            await self._protocol.close()
+        if self._transport:
+            self._transport.close()
 
     async def connect(self, loop=None):
         async def do_connect():
@@ -181,12 +183,12 @@ class RabbitChannelMixIn:
                 await self.disconnect()
 
             if os.getenv('DEBUG', 'false') == 'true':
-                # todo: should make this use config, and not env vars
+                # todo: should make this use config and logging, and not env vars
                 print(dict(host=self.host,
                            port=self.port,
                            virtualhost=self.virtualhost,
                            login=self.username,
-                           password=self.password,
+                           password='*******',
                            ssl=self.ssl,
                            verify_ssl=self.verify_ssl,
                            heartbeat=self.heartbeat,
@@ -438,6 +440,9 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
 
         await self._channel_ready.wait()
 
+        # channel hasn't actually been bootstraped yet
+        await self._bootstrap_channel(self.channel)
+
         try:
             await self._done_future
         except asyncio.CancelledError:
@@ -548,9 +553,9 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
 
     async def _bootstrap_channel(self, channel):
         self.channel = channel
-        while self._handler is None:
-            # we havent started yet
-            await asyncio.sleep(1)
+
+        if self._handler is None:
+            return
 
         await self.channel.basic_qos(prefetch_count=1)
         resp = await self.channel.basic_consume(
