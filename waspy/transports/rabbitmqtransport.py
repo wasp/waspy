@@ -6,7 +6,7 @@ import os
 
 import aioamqp
 import re
-from aioamqp import channel
+from aioamqp import channel, protocol
 
 from .transportabc import TransportABC, ClientTransportABC, WorkerTransportABC
 from ..webtypes import Request, Response, Methods, NotRoutableError
@@ -161,15 +161,17 @@ class RabbitChannelMixIn:
         raise NotImplementedError
 
     async def _handle_rabbit_error(self, exception):
-        print(exception)
         try:
             raise exception
         except (aioamqp.ChannelClosed, aioamqp.AmqpClosedConnection):
-            logger.exception("Rabbitmq channel closed")
+            '''logger.exception("Rabbitmq channel closed")'''
 
     async def disconnect(self):
-        if self._protocol:
-            await self._protocol.close()
+        if self._protocol and self._protocol.state != protocol.CLOSED:
+            if self._protocol.state == protocol.CLOSING:
+                await self._protocol.wait_closed()
+            else:
+                await self._protocol.close()
         if self._transport:
             self._transport.close()
 
