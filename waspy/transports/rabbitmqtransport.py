@@ -523,7 +523,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         if properties.content_encoding:
             headers['content-encoding'] = properties.content_encoding
 
-        logger.debug('received invomind request via rabbitmq: %s', request)
+        logger.debug('received incoming request via rabbitmq: %s', request)
         response = await self._handler(request)
         if response is None:
             # task got cancelled. Dont send a response.
