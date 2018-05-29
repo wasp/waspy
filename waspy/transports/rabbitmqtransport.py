@@ -155,6 +155,7 @@ def parse_rabbit_message(body, envelope, properties):
 
 class RabbitChannelMixIn:
     def __init__(self):
+        self.channel = None
         self._channel_ready = asyncio.Event()
 
     async def _bootstrap_channel(self, channel):
@@ -163,8 +164,13 @@ class RabbitChannelMixIn:
     async def _handle_rabbit_error(self, exception):
         try:
             raise exception
-        except (aioamqp.ChannelClosed, aioamqp.AmqpClosedConnection):
-            '''logger.exception("Rabbitmq channel closed")'''
+        except aioamqp.ChannelClosed:
+            logger.warning("RabbitMQ channel closed... Creating new channel")
+            self.channel = None
+            channel = await self._protocol.channel()
+            await self._bootstrap_channel(channel)
+        except aioamqp.AmqpClosedConnection:
+            logger.error("RabbitMQ connection closed")
 
     async def disconnect(self):
         if self._protocol and self._protocol.state != protocol.CLOSED:
