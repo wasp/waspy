@@ -166,9 +166,11 @@ class RabbitChannelMixIn:
             raise exception
         except aioamqp.ChannelClosed:
             logger.warning("RabbitMQ channel closed... Creating new channel")
+            self._channel_ready.clear()
             self.channel = None
             channel = await self._protocol.channel()
             await self._bootstrap_channel(channel)
+            self._channel_ready.set()
         except aioamqp.AmqpClosedConnection:
             logger.error("RabbitMQ connection closed")
 
