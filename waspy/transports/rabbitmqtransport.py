@@ -1,3 +1,5 @@
+from . import rabbit_patches
+
 import asyncio
 import logging
 import urllib.parse
@@ -6,137 +8,14 @@ import os
 
 import aioamqp
 import re
-from aioamqp import channel, protocol
+from aioamqp import protocol
+from aioamqp.channel import Channel
+
 
 from .transportabc import TransportABC, ClientTransportABC, WorkerTransportABC
 from ..webtypes import Request, Response, Methods, NotRoutableError
 
-
 logger = logging.getLogger("waspy")
-
-
-""" This is ugly, but you do what you gotta do
-
-So... on that note: Lets do some monkey patching!!
-We need to support mandatory bit, and handle returned messages, but
-aioamqp doesnt support it yet. 
-(follow https://github.com/Polyconseil/aioamqp/pull/158)
-
-monkey patching _write_frame_awaiting_response fixes a waiter error. 
-(follow PR here: https://github.com/Polyconseil/aioamqp/pull/159)
-
-"""
-import io
-from aioamqp import frame as amqp_frame
-from aioamqp import constants as amqp_constants
-
-
-class ReturnEnvelope:
-    __slots__ = ('reply_code', 'reply_text',
-                 'exchange_name', 'routing_key')
-
-    def __init__(self, reply_code, reply_text, exchange_name, routing_key):
-        self.reply_code = reply_code
-        self.reply_text = reply_text
-        self.exchange_name = exchange_name
-        self.routing_key = routing_key
-
-
-async def basic_return(self, frame):
-    response = amqp_frame.AmqpDecoder(frame.payload)
-    reply_code = response.read_short()
-    reply_text = response.read_shortstr()
-    exchange_name = response.read_shortstr()
-    routing_key = response.read_shortstr()
-    content_header_frame = await self.protocol.get_frame()
-
-    buffer = io.BytesIO()
-    while buffer.tell() < content_header_frame.body_size:
-        content_body_frame = await self.protocol.get_frame()
-        buffer.write(content_body_frame.payload)
-
-    body = buffer.getvalue()
-    envelope = ReturnEnvelope(reply_code, reply_text,
-                              exchange_name, routing_key)
-    properties = content_header_frame.properties
-    callback = self.return_callback
-    if self.return_callback is None:
-        # they have set mandatory bit, but havent added a callback
-        logger.warning(
-            'You have received a returned message, but dont have a callback registered for returns.'
-            ' Please set channel.return_callback')
-    else:
-        await callback(self, body, envelope, properties)
-
-
-async def dispatch_frame(self, frame):
-    methods = {
-        (amqp_constants.CLASS_CHANNEL, amqp_constants.CHANNEL_OPEN_OK): self.open_ok,
-        (amqp_constants.CLASS_CHANNEL, amqp_constants.CHANNEL_FLOW_OK): self.flow_ok,
-        (amqp_constants.CLASS_CHANNEL, amqp_constants.CHANNEL_CLOSE_OK): self.close_ok,
-        (amqp_constants.CLASS_CHANNEL, amqp_constants.CHANNEL_CLOSE): self.server_channel_close,
-
-        (amqp_constants.CLASS_EXCHANGE, amqp_constants.EXCHANGE_DECLARE_OK): self.exchange_declare_ok,
-        (amqp_constants.CLASS_EXCHANGE, amqp_constants.EXCHANGE_BIND_OK): self.exchange_bind_ok,
-        (amqp_constants.CLASS_EXCHANGE, amqp_constants.EXCHANGE_UNBIND_OK): self.exchange_unbind_ok,
-        (amqp_constants.CLASS_EXCHANGE, amqp_constants.EXCHANGE_DELETE_OK): self.exchange_delete_ok,
-
-        (amqp_constants.CLASS_QUEUE, amqp_constants.QUEUE_DECLARE_OK): self.queue_declare_ok,
-        (amqp_constants.CLASS_QUEUE, amqp_constants.QUEUE_DELETE_OK): self.queue_delete_ok,
-        (amqp_constants.CLASS_QUEUE, amqp_constants.QUEUE_BIND_OK): self.queue_bind_ok,
-        (amqp_constants.CLASS_QUEUE, amqp_constants.QUEUE_UNBIND_OK): self.queue_unbind_ok,
-        (amqp_constants.CLASS_QUEUE, amqp_constants.QUEUE_PURGE_OK): self.queue_purge_ok,
-
-        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_QOS_OK): self.basic_qos_ok,
-        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_CONSUME_OK): self.basic_consume_ok,
-        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_CANCEL_OK): self.basic_cancel_ok,
-        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_GET_OK): self.basic_get_ok,
-        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_GET_EMPTY): self.basic_get_empty,
-        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_DELIVER): self.basic_deliver,
-        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_CANCEL): self.server_basic_cancel,
-        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_ACK): self.basic_server_ack,
-        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_NACK): self.basic_server_nack,
-        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_RECOVER_OK): self.basic_recover_ok,
-        (amqp_constants.CLASS_BASIC, amqp_constants.BASIC_RETURN): self.basic_return,
-
-        (amqp_constants.CLASS_CONFIRM, amqp_constants.CONFIRM_SELECT_OK): self.confirm_select_ok,
-    }
-
-    if (frame.class_id, frame.method_id) not in methods:
-        raise NotImplementedError("Frame (%s, %s) is not implemented" % (frame.class_id, frame.method_id))
-    await methods[(frame.class_id, frame.method_id)](frame)
-
-
-async def _write_frame_awaiting_response(self, waiter_id, frame, request,
-                                         no_wait, check_open=True, drain=True):
-    '''Write a frame and set a waiter for
-    the response (unless no_wait is set)'''
-    if no_wait:
-        await self._write_frame(frame, request, check_open=check_open,
-                                     drain=drain)
-        return None
-
-    f = self._set_waiter(waiter_id)
-    try:
-        await self._write_frame(frame, request, check_open=check_open,
-                                     drain=drain)
-    except Exception:
-        self._get_waiter(waiter_id)
-        f.cancel()
-        raise
-    result = await f
-    try:
-        self._get_waiter(waiter_id)
-    except aioamqp.SynchronizationError:
-        # no waiter to get
-        pass
-    return result
-
-channel.Channel._write_frame_awaiting_response = _write_frame_awaiting_response
-channel.Channel.dispatch_frame = dispatch_frame
-channel.Channel.basic_return = basic_return
-
-""" End of monkey patching"""
 
 
 class NackMePleaseError(Exception):
@@ -144,9 +23,6 @@ class NackMePleaseError(Exception):
         I have time to add a real worker tier type connector support in waspy
         TODO: Please get rid of this as soon as your able to
     """
-
-
-from aioamqp.channel import Channel
 
 
 def parse_rabbit_message(body, envelope, properties):
@@ -162,17 +38,19 @@ class RabbitChannelMixIn:
         raise NotImplementedError
 
     async def _handle_rabbit_error(self, exception):
-        try:
-            raise exception
-        except aioamqp.ChannelClosed:
-            logger.warning("RabbitMQ channel closed... Creating new channel")
-            self._channel_ready.clear()
-            self.channel = None
-            channel = await self._protocol.channel()
-            await self._bootstrap_channel(channel)
-            self._channel_ready.set()
-        except aioamqp.AmqpClosedConnection:
+        if type(exception) == aioamqp.ChannelClosed:
+            if self._protocol and self._protocol.state not in (protocol.CLOSING, protocol.CLOSED):
+                logger.warning("RabbitMQ channel closed... Creating new channel")
+                self._channel_ready.clear()
+                self.channel = None
+                channel = await self._protocol.channel()
+                await self._bootstrap_channel(channel)
+                self._channel_ready.set()
+        elif type(exception) == aioamqp.AmqpClosedConnection:
             logger.error("RabbitMQ connection closed")
+        else:
+            logger.error(f"Unknown exception occurred: {exception}")
+            raise exception
 
     async def disconnect(self):
         if self._protocol and self._protocol.state != protocol.CLOSED:
@@ -188,7 +66,6 @@ class RabbitChannelMixIn:
             if self.channel and self.channel.is_open:
                 return
             logger.warning('Establishing new connection')
-            channel = None
             if self._protocol:
                 await self.disconnect()
 
@@ -238,6 +115,7 @@ class RabbitChannelMixIn:
 
 class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
     _CLOSING_SENTINAL = object()
+
     def __init__(self, *, url=None, port=5672, virtualhost='/',
                  username='guest', password='guest',
                  ssl=False, verify_ssl=True, heartbeat=20):
@@ -395,7 +273,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         self.ssl = ssl
         self.verify_ssl = verify_ssl
         self.create_queue = create_queue
-        self._use_acks=use_acks
+        self._use_acks = use_acks
         self._transport = None
         self._protocol = None
         self.channel = None
