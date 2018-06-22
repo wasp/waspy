@@ -14,6 +14,7 @@ from aioamqp.channel import Channel
 
 from .transportabc import TransportABC, ClientTransportABC, WorkerTransportABC
 from ..webtypes import Request, Response, Methods, NotRoutableError
+from waspy.listeners.transport_listener_abc import TransportListenerABC
 
 logger = logging.getLogger("waspy")
 
@@ -34,6 +35,8 @@ class RabbitChannelMixIn:
         self.channel = None
         self._channel_ready = asyncio.Event()
 
+        self.channels = {}
+
     async def _bootstrap_channel(self, channel):
         raise NotImplementedError
 
@@ -52,7 +55,21 @@ class RabbitChannelMixIn:
             logger.error(f"Unknown exception occurred: {exception}")
             raise exception
 
+    async def create_channel(self) -> aioamqp.channel.Channel:
+        channel = await self._protocol.channel()
+        self.channels[channel.channel_id] = channel
+        return channel
+    
+    async def close_channel(self, channel: aioamqp.channel.Channel) -> None:
+        del self.channels[channel.channel_id]
+        await channel.close()
+
     async def disconnect(self):
+        for channel in self.channels.values():
+            if channel.is_open:
+                await channel.close()
+        
+        self.channels = {}
         if self._protocol and self._protocol.state != protocol.CLOSED:
             if self._protocol.state == protocol.CLOSING:
                 await self._protocol.wait_closed()
@@ -102,6 +119,11 @@ class RabbitChannelMixIn:
             try:
                 while not self._closing:
                     await do_connect()
+                    if hasattr(self, 'listeners'):
+                        for listener in self.listeners:
+                            channel = await self.create_channel()
+                            await listener.set_channel(channel)
+                            await listener.start()
                     await self._protocol.wait_closed()
                     self._channel_ready.clear()
                     self.channel = None
@@ -288,6 +310,8 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         self.heartbeat = heartbeat
         self._config = {}
 
+        self.listeners = []
+
     def get_client(self):
         if not self._client:
             # TODO: not ideal, the client/server should ideally share a channel
@@ -453,6 +477,9 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         )
         self._consumer_tag = resp.get('consumer_tag')
 
+    def add_listener(self, listener: TransportListenerABC):
+        self.listeners.append(listener)
+        listener.set_transport(self)
 
 def parse_url_to_topic(method, route):
     """
@@ -474,19 +501,3 @@ def parse_url_to_topic(method, route):
     topic = f'{method.value.lower()}.{route}'
     # need to replace `{id}` and `{id}:some_method` with just `*`
     return re.sub(r"\.\{[^\}]*\}[:\w\d_-]*", ".*", topic)
-
-
-class RabbitMQWorkerTransport(RabbitMQTransport, WorkerTransportABC):
-    def __init__(self, *, url, port=5672, queue='', virtualhost='/',
-                 username='guest', password='guest',
-                 ssl=False, verify_ssl=True, create_queue=True, heartbeat=20):
-        super().__init__(url=url, port=port, queue=queue,
-                         virtualhost=virtualhost, username=username,
-                         password=password, ssl=ssl, verify_ssl=verify_ssl,
-                         create_queue=create_queue, use_acks=True,
-                         heartbeat=heartbeat)
-        self._worker = None
-
-    def start(self, worker):
-        print(f"-- Listening for rabbitmq messages on queue {self.queue} --")
-        self._worker = worker
