@@ -194,8 +194,7 @@ class HTTPTransport(TransportABC):
             lambda: _HTTPServerProtocol(parent=self, loop=self._loop),
             host='0.0.0.0',
             port=self.port,
-            reuse_address=True,
-            reuse_port=True)
+            reuse_address=True)
         print(f'-- Listening for HTTP on port {self.port} --')
         try:
             await self._done_future
@@ -382,5 +381,5 @@ class _HTTPServerProtocol(asyncio.Protocol):
         self.attempt_close()
 
     def attempt_close(self):
-        if self.request == 0:
+        if self.request == 0 and self._transport:
             self._transport.close()
