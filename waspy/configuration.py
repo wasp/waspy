@@ -77,6 +77,13 @@ class Config:
             return default
         return env
 
+    def __contains__(self, item):
+        try:
+            self.__getitem__(item)
+            return True
+        except ConfigError:
+            return False
+
     def _create_basename(self, item):
         if self.basename:
             return self.basename + '.' + item
