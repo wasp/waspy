@@ -83,5 +83,6 @@ def test_get_flat_with_underscores_envvar(config, monkeypatch):
     monkeypatch.setenv('FLAT_WITH_UNDERSCORES', 'blarg')
     assert config['flat_with_underscores'] == 'blarg'
 
-
-
+def test_using_in_syntax(config):
+    assert 'flat' in config
+    assert 'nope' not in config
