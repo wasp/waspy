@@ -14,7 +14,7 @@ setup(
         'pyyaml==3.12',
         'aenum==1.4.5'
     ],
-    packages=['waspy', 'waspy.transports'],
+    packages=['waspy', 'waspy.transports', 'waspy.listeners'],
     long_description=long_description,
     long_desciption_comtent_type='text/markdown',
     url='https://github.com/wasp/waspy',

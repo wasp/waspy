@@ -46,7 +46,7 @@ class Application:
     def __init__(self,
                  transport: Union[TransportABC,
                                   Iterable[TransportABC]]=None,
-                 *,
+                 *, 
                  middlewares: List[callable]=None,
                  default_headers: dict=None,
                  debug: bool=False,
@@ -56,13 +56,13 @@ class Application:
         if transport is None:
             from waspy.transports.httptransport import HTTPTransport
             transport = HTTPTransport()
-        if isinstance(transport, list):   
+        if isinstance(transport, (list, set)):   
             transport = tuple(transport)
         if not isinstance(transport, tuple):
             transport = (transport,)
         if middlewares is None:
             middlewares = ()
-        middlewares = tuple([m for m in middlewares])
+        middlewares = tuple(m for m in middlewares)
         middlewares += (response_wrapper_factory,)
         if router is None:
             router = Router()
