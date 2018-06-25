@@ -9,5 +9,5 @@ class TransportListenerABC(ABC):
         pass
 
     @abstractmethod
-    async def handle_work(self, data: Dict, envelope: Dict=None, properties: Dict=None) -> None:
+    async def handle_work(self, data: Dict, **kwargs) -> None:
         pass
