@@ -10,7 +10,7 @@ setup(
     version='0.38.0',
     install_requires=[
         'httptools==0.0.10',
-        'aioamqp==0.10.0',
+        'aioamqp==0.11.0',
         'pyyaml==3.12',
         'aenum==1.4.5'
     ],
