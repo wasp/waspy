@@ -1,7 +1,11 @@
 import json
+import warnings
 from collections import defaultdict
 from urllib import parse
 from aenum import extend_enum
+
+from waspy import exceptions
+from waspy.parser import parsers
 from .router import Methods
 from http import HTTPStatus, cookies
 
@@ -54,11 +58,79 @@ class QueryParams:
         return parse.urlencode(self.mappings, doseq=True)
 
 
-class Request:
+class Parseable:
+    def __init__(self, *args, content_type=None, body=None, **kwargs):
+        self._parser = None
+        self.content_type = content_type
+        self.app = None
+
+        self.original_body = body
+        self._body = None
+        self._raw_body = None
+
+    @property
+    def parser(self):
+        if not self._parser:
+            if not self.content_type and self.app.default_content_type:
+                self.content_type = self.app.default_content_type
+            self._parser = parsers.get(self.content_type)
+            if not self._parser:
+                raise exceptions.UnsupportedMediaType(self.content_type)
+        return self._parser
+
+    @property
+    def body(self) -> dict:
+        """ Decoded Body """
+        if self._body is None and self.original_body is not None:
+            if isinstance(self.original_body, bytes):
+                self._body = self.parser.decode(self.original_body)
+            elif isinstance(self.original_body, dict):
+                self._body = self.original_body
+        return self._body
+
+    @body.setter
+    def body(self, value):
+        if isinstance(value, bytes):
+            # Transports sometimes set the value after the response is created
+            # Setting it to the original_body allows for lazy parsing
+            self.original_body = value
+            # Reset body and raw_body
+            self._raw_body = None
+            self._body = None
+        elif isinstance(value, dict):
+            self._body = value
+            # Reset the raw_body
+            self.original_body = value
+            self._raw_body = None
+
+    @property
+    def raw_body(self) -> bytes:
+        """ Encoded Body """
+        if self._raw_body is None and self.original_body is not None:
+            if isinstance(self.original_body, dict):
+                self._raw_body = self.parser.encode(self.original_body)
+                if isinstance(self._raw_body, str):
+                    self._raw_body = self._raw_body.encode()
+            elif isinstance(self.original_body, str):
+                self._raw_body = self.original_body.encode()
+            elif isinstance(self.original_body, bytes):
+                self._raw_body = self.original_body
+        return self._raw_body
+
+    def json(self) -> dict:
+        """ Simply an alias now for getting the decoded body """
+        return self.body
+
+
+class Request(Parseable):
     def __init__(self, headers: dict = None,
                  path: str = None, correlation_id: str = None,
                  method: str = None, query_string: str = None,
-                 body: bytes=None, content_type='application/json'):
+                 body: bytes=None, content_type=None):
+
+        super().__init__(
+            headers=headers, path=path, correlation_id=correlation_id, method=method,
+            query_string=query_string, body=body, content_type=content_type)
 
         if not headers:
             headers = {}
@@ -71,12 +143,10 @@ class Request:
         self.method = method  # this is a property setter
         self.query_string = query_string
         self._query_params = None
-        self.body = body
         self.path_params = {}
         self._handler = None
         self.app = None
         self.content_type = content_type
-        self._json = None
         self._cookies = None
 
     @property
@@ -112,15 +182,6 @@ class Request:
             self._query_params = QueryParams.from_string(self.query_string)
         return self._query_params
 
-    def json(self) -> dict:
-        if not self._json:
-            # convert body into a json dict
-            try:
-                self._json = json.loads(self.body.decode())
-            except json.JSONDecodeError as ex:
-                raise JSONDecodeError from ex
-        return self._json
-
     def __str__(self):
         query = '?' + self.query_string if self.query_string else ''
         return('<Request({method} {path}{query})@{id}>'
@@ -134,10 +195,10 @@ class Request:
                 f'content_type={self.content_type})')
 
 
-class Response:
+class Response(Parseable):
     def __init__(self, headers=None, correlation_id=None,
                  body=None, status=HTTPStatus.OK,
-                 content_type='application/json', meta: dict=None):
+                 content_type=None, meta: dict=None):
         """
         Response object
         :param headers:
@@ -148,6 +209,9 @@ class Response:
         :param meta: Extra context information.
             Not to be returned through transport
         """
+        super().__init__(
+            headers=headers, correlation_id=correlation_id,
+            body=body, status=status, content_type=content_type, meta=meta)
         if not headers:
             headers = dict()
         if isinstance(status, int):  # convert to enum
@@ -156,69 +220,13 @@ class Response:
             meta = {}
         self.headers = headers
         self.correlation_id = correlation_id
-        self.body = body
+        self.original_body = body
         self.status = status
-        self.content_type = content_type
         self.meta = meta
-        self._data = None
-        self._json = None
+        self.app = None
+        self._body = None
+        self._raw_body = None
 
     def __str__(self):
         return('<Response({status})@{id}>'
                .format(status=self.status, id=id(self)))
-
-    @property
-    def data(self):
-        if self._data is None and self.body:
-            if (self.content_type == 'application/json' and
-                    isinstance(self.body, dict)):
-                self._data = json.dumps(self.body)
-            else:
-                self._data = self.body
-            if isinstance(self._data, str):
-                self._data = self._data.encode()
-        return self._data
-
-    def json(self) -> dict:
-        """
-        Used for client response
-        """
-        if self.body is None:
-            self._json = {}
-        elif not self._json:
-            # convert body into a json dict
-            try:
-                self._json = json.loads(self.body.decode())
-            except json.JSONDecodeError as ex:
-                raise JSONDecodeError from ex
-        return self._json
-
-
-class ResponseError(Exception):
-    def __init__(self, message=None, status=None, *, body=None, headers=None,
-                 correlation_id=None, reason=None, log=False):
-        super().__init__(message)
-        self.message = message
-        if hasattr(self, 'status') and status is None:
-            status = self.status
-        if hasattr(self, 'body') and body is None:
-            body = self.body
-        if hasattr(self, 'reason') and reason is None:
-            reason = self.reason
-        if hasattr(self, 'log') and log == False:
-            log = self.log
-        if reason and not body:
-            body = {'reason': reason}
-        self.response = Response(status=status, body=body, headers=headers,
-                                 correlation_id=correlation_id)
-        self.log = log
-
-
-class JSONDecodeError(ResponseError):
-    status = 400
-    reason = 'Invalid Json'
-
-
-class NotRoutableError(ResponseError):
-    status = 404
-    reason = 'No route found'

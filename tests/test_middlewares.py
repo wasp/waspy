@@ -31,5 +31,6 @@ def test_that_middleware_wrapping_works():
     handler = app.router.get_handler_for_request(request)
     assert handler != handle
     result = loop.run_until_complete(handler(request))
+    result.app = app
     assert isinstance(result, Response)
-    assert result.body == 'c'
+    assert result.original_body == 'c'

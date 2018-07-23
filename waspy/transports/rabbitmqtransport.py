@@ -13,8 +13,10 @@ from aioamqp.channel import Channel
 
 
 from .transportabc import TransportABC, ClientTransportABC, WorkerTransportABC
-from ..webtypes import Request, Response, Methods, NotRoutableError
+from ..webtypes import Request, Response, Methods
+from ..exceptions import NotRoutableError
 from waspy.listeners.transport_listener_abc import TransportListenerABC
+
 
 logger = logging.getLogger("waspy")
 
@@ -441,7 +443,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         if reply_to:
             response.headers['Status'] = str(response.status.value)
 
-            payload = response.data or b'None'
+            payload = response.raw_body or b'None'
 
             properties = {
                 'correlation_id': response.correlation_id,

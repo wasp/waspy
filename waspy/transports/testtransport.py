@@ -48,7 +48,7 @@ class TestTransport(TransportABC):
             request.body = request.body.encode()
 
         response = await self.handler(request)
-        response.body = response.data
+        response.body = response.body
         return response
 
     async def start(self, request_handler: callable):
