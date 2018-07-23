@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import Mock
-from waspy.router import Router, Methods
+from waspy.router import Router, Methods, _send_404, _send_405
 
 
 @pytest.fixture
@@ -29,6 +29,8 @@ def router():
                     with router_.prefix('/nest-5'):
                         router_.get('/nest-5-get', 14)
                     router_.get('/nest-4-get-2', 15)
+
+    router_.post('/test-405', 16)
 
     # now wrap all handlers with nothing
     handler_gen = router_._get_and_wrap_routes()
@@ -60,6 +62,8 @@ def router():
     ('/nest-1/nest-2/nest-3/_nest3id/nest-4/nest-4-get', 13, ['nest3id']),
     ('/nest-1/nest-2/nest-3/_nest3id/nest-4/nest-5/nest-5-get', 14, ['nest3id']),
     ('/nest-1/nest-2/nest-3/_nest3id/nest-4/nest-4-get-2', 15, ['nest3id']),
+    ('/not-found', _send_404, []),
+    ('/test-405', _send_405, [])
 ])
 def test_get_handler(path, expected_handler, expected_params, router):
     # Set up dummy request

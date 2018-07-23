@@ -2,6 +2,7 @@ import re
 import warnings
 
 from contextlib import contextmanager
+from http import HTTPStatus
 from typing import Callable, Union
 
 from enum import Enum
@@ -36,7 +37,11 @@ class Methods(Enum):
 
 
 async def _send_404(request):
-    raise webtypes.ResponseError(status=404)
+    raise webtypes.ResponseError(status=HTTPStatus.METHOD_NOT_ALLOWED)
+
+
+async def _send_405(request):
+    raise webtypes.ResponseError(status=HTTPStatus.METHOD_NOT_ALLOWED)
 
 
 class Router:
@@ -57,6 +62,8 @@ class Router:
         self.options_handler = None
 
         self.handle_404 = _send_404  # the 404 route will skip middlewares
+        self.handle_405 = _send_405  # the 405 handler will skip middleware
+
         self._prefix = ''
 
         # A list of tuples (method, url)
@@ -93,6 +100,7 @@ class Router:
         d = self._routes
         params = []
         raw_path_string = '/'
+        is_a_path = False
         try:
             for portion in route.split('/'):
                 sub = d.get(portion, None)
@@ -109,8 +117,13 @@ class Router:
                 else:
                     raw_path_string += portion + '/'
                 d = sub
+            if any(isinstance(key, Methods) for key in d):
+                is_a_path = True
             wrapped, handler, keys = d[method]
         except KeyError:
+            if is_a_path:
+                request._handler = self.handle_405
+                return self.handle_405
             # No handler for given route
             request._handler = self.handle_404
             return self.handle_404
