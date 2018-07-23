@@ -37,7 +37,7 @@ class Methods(Enum):
 
 
 async def _send_404(request):
-    raise webtypes.ResponseError(status=HTTPStatus.METHOD_NOT_ALLOWED)
+    raise webtypes.ResponseError(status=HTTPStatus.NOT_FOUND)
 
 
 async def _send_405(request):
