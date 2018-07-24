@@ -115,6 +115,8 @@ class Parseable:
                 self._raw_body = self.original_body.encode()
             elif isinstance(self.original_body, bytes):
                 self._raw_body = self.original_body
+            else:
+                self._raw_body = self.parser.encode(self.original_body)
         return self._raw_body
 
     def json(self) -> dict:
