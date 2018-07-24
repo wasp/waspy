@@ -84,7 +84,7 @@ class Parseable:
         if self._body is None and self.original_body is not None:
             if isinstance(self.original_body, bytes):
                 self._body = self.parser.decode(self.original_body)
-            elif isinstance(self.original_body, dict):
+            else:
                 self._body = self.original_body
         return self._body
 
@@ -117,6 +117,8 @@ class Parseable:
                 self._raw_body = self.original_body
             else:
                 self._raw_body = self.parser.encode(self.original_body)
+                if isinstance(self._raw_body, str):
+                    self._raw_body = self._raw_body.encode()
         return self._raw_body
 
     def json(self) -> dict:
