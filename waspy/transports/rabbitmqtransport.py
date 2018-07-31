@@ -252,7 +252,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             raise
 
     async def handle_responses(self, channel, body, envelope, properties):
-        future = self._response_futures[properties.message_id]
+        future = self._response_futures.pop(properties.message_id)
 
         headers = properties.headers
         status = headers.pop('Status')
@@ -266,7 +266,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             future.set_result(response)
 
     async def handle_return(self, channel, body, envelope, properties):
-        future = self._response_futures.get(properties.message_id, None)
+        future = self._response_futures.pop(properties.message_id, None)
         if not future:
             logger.warning('Got a returned message with nowhere to send it')
             return
