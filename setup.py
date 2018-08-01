@@ -11,7 +11,7 @@ setup(
     install_requires=[
         'httptools==0.0.10',
         'aioamqp==0.11.0',
-        'pyyaml==3.12',
+        'pyyaml==3.13',
         'aenum==1.4.5'
     ],
     packages=['waspy', 'waspy.transports', 'waspy.listeners'],
