@@ -259,7 +259,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
 
         response = Response(headers=headers,
                             correlation_id=properties.correlation_id,
-                            body=body,
+                            raw_body=body,
                             status=int(status),
                             content_type=properties.content_type)
         if not future.done():
