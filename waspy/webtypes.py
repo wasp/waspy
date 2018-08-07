@@ -61,18 +61,29 @@ class QueryParams:
 class Parseable:
     def __init__(self, *args, content_type=None, body=None, **kwargs):
         self._parser = None
-        self.content_type = content_type
         self.app = None
-
         self.original_body = body
         self._body = None
         self._raw_body = None
 
+        self.content_type = content_type
+
+    @property
+    def content_type(self):
+        if self._content_type:
+            return self._content_type
+        if self.app:
+            return self.app.default_content_type
+
+    @content_type.setter
+    def content_type(self, value):
+        if value:
+            # Throw away charset for now. We will have to figure this out later.
+            self._content_type = value.split(';')[0]
+
     @property
     def parser(self):
         if not self._parser:
-            if not self.content_type and self.app.default_content_type:
-                self.content_type = self.app.default_content_type
             self._parser = parsers.get(self.content_type)
             if not self._parser:
                 raise exceptions.UnsupportedMediaType(self.content_type)
