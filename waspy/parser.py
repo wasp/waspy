@@ -29,10 +29,11 @@ class JSONParser(ParserABC):
         return json.dumps(data)
 
     def decode(self, data: bytes):
-        try:
-            return json.loads(data)
-        except json.JSONDecodeError:
-            raise ParseError("Invalid JSON")
+        if data:
+            try:
+                return json.loads(data)
+            except json.JSONDecodeError:
+                raise ParseError("Invalid JSON")
 
 
 parsers = {}

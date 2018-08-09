@@ -178,8 +178,13 @@ class Application:
                 response.app = self
             except ResponseError as r:
                 parser = app_parsers.get(request.content_type, None)
+
+                # Content-Type of an error response will be the same as the incoming request
+                # unless a parser for that content type is not found.
                 if not parser:
-                    content_type = self.default_content_type
+                    content_type = r.content_type
+                    if not content_type:
+                        content_type = self.default_content_type
                 else:
                     content_type = request.content_type
                 response = Response(
@@ -191,7 +196,7 @@ class Application:
                     exc_info = sys.exc_info()
                     self.logger.log_exception(request, exc_info, level='warning')
             # invoke serialization (json) to make sure it works
-            _ = response.raw_body
+            _ = response.body
 
         except CancelledError:
             # This error can happen if a client closes the connection

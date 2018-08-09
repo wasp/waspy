@@ -1,5 +1,3 @@
-import json
-import warnings
 from collections import defaultdict
 from urllib import parse
 from aenum import extend_enum
@@ -66,6 +64,7 @@ class Parseable:
         self._body = None
         self._raw_body = None
 
+        self._content_type = None
         self.content_type = content_type
 
     @property
