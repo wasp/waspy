@@ -196,7 +196,7 @@ class Application:
                     exc_info = sys.exc_info()
                     self.logger.log_exception(request, exc_info, level='warning')
             # invoke serialization (json) to make sure it works
-            _ = response.raw_body
+            _ = response.body
 
         except CancelledError:
             # This error can happen if a client closes the connection

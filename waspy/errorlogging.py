@@ -1,6 +1,8 @@
 import sys
 import logging
 
+from waspy.exceptions import UnsupportedMediaType
+
 logger = logging.getLogger('waspy')
 
 
@@ -32,10 +34,14 @@ class SentryLogging(ErrorLoggingBase):
         self.raven.transaction.clear()
 
     def _get_sentry_details(self, request, exc_info):
+        try:
+            body = request.body
+        except UnsupportedMediaType:
+            body = request.original_body
         data = {
             'request': {
                 'method': request.method.value,
-                'data': request.body,
+                'data': body,
                 'query_string': request.query_string,
                 'url': '/' + request.path.replace('.', '/'),
                 'content-type': request.content_type,

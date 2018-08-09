@@ -14,7 +14,7 @@ class ResponseError(Exception):
             reason = self.reason
         if hasattr(self, 'log') and log is False:
             log = self.log
-        if hasattr(self, 'content_type' and content_type is None):
+        if hasattr(self, 'content_type') and content_type is None:
             content_type = self.content_type
         if reason and not body:
             body = {'reason': reason}

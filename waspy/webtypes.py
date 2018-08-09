@@ -1,5 +1,3 @@
-import json
-import warnings
 from collections import defaultdict
 from urllib import parse
 from aenum import extend_enum
