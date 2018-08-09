@@ -66,6 +66,7 @@ class Parseable:
         self._body = None
         self._raw_body = None
 
+        self._content_type = None
         self.content_type = content_type
 
     @property
