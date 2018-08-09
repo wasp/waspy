@@ -3,7 +3,7 @@ from http import HTTPStatus
 
 class ResponseError(Exception):
     def __init__(self, message=None, status: HTTPStatus=None, *, body=None, headers=None,
-                 correlation_id=None, reason=None, log=False):
+                 correlation_id=None, reason=None, content_type=None, log=False):
         super().__init__(message)
         self.message = message
         if hasattr(self, 'status') and status is None:
@@ -12,8 +12,10 @@ class ResponseError(Exception):
             body = self.body
         if hasattr(self, 'reason') and reason is None:
             reason = self.reason
-        if hasattr(self, 'log') and log == False:
+        if hasattr(self, 'log') and log is False:
             log = self.log
+        if hasattr(self, 'content_type' and content_type is None):
+            content_type = self.content_type
         if reason and not body:
             body = {'reason': reason}
 
@@ -23,6 +25,7 @@ class ResponseError(Exception):
         self.headers = headers
         self.correlation_id = correlation_id
         self.reason = reason
+        self.content_type = content_type
 
 
 class ParseError(ResponseError):
