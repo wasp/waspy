@@ -34,14 +34,10 @@ class SentryLogging(ErrorLoggingBase):
         self.raven.transaction.clear()
 
     def _get_sentry_details(self, request, exc_info):
-        try:
-            body = request.body
-        except UnsupportedMediaType:
-            body = request.original_body
         data = {
             'request': {
                 'method': request.method.value,
-                'data': body,
+                'data': request.body if request.original_body else None,
                 'query_string': request.query_string,
                 'url': '/' + request.path.replace('.', '/'),
                 'content-type': request.content_type,
