@@ -204,7 +204,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             headers['x-wasp-query-string'] = query
 
         if not body:
-            body = b'None'
+            body = b'null'
         message_id = str(uuid.uuid4())
         properties = {
             'headers': headers,
@@ -443,7 +443,7 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         if reply_to:
             response.headers['Status'] = str(response.status.value)
 
-            payload = response.raw_body or b'None'
+            payload = response.raw_body or b'null'
 
             properties = {
                 'correlation_id': response.correlation_id,
