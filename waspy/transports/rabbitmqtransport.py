@@ -257,6 +257,9 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         headers = properties.headers
         status = headers.pop('Status')
 
+        if body == b'None':
+            body = None
+
         response = Response(headers=headers,
                             correlation_id=properties.correlation_id,
                             body=body,
@@ -401,6 +404,9 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
             return
 
         self._counter += 1
+
+        if body == b'None':
+            body = None
         headers = properties.headers or {}
         query = headers.pop('x-wasp-query-string', '').lstrip('?')
         correlation_id = properties.correlation_id
