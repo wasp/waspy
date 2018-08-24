@@ -66,6 +66,7 @@ class Parseable:
 
         self._content_type = None
         self.content_type = content_type
+        self.ignore_content_type = kwargs.get('ignore_content_type', False)
 
     @property
     def content_type(self):
@@ -84,13 +85,15 @@ class Parseable:
     def parser(self):
         if not self._parser:
             self._parser = parsers.get(self.content_type)
-            if not self._parser:
+            if not self._parser and not self.ignore_content_type:
                 raise exceptions.UnsupportedMediaType(self.content_type)
         return self._parser
 
     @property
     def body(self) -> dict:
         """ Decoded Body """
+        if self.ignore_content_type:
+            return self.original_body
         if self._body is None and self.original_body is not None:
             if isinstance(self.original_body, bytes):
                 self._body = self.parser.decode(self.original_body)
