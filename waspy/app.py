@@ -264,4 +264,8 @@ class Application:
 
     def shutdown(self):
         self.loop.run_until_complete(self.run_on_stop_hooks())
+        tasks = asyncio.all_tasks(self.loop)
+        while tasks:
+            self.loop.run_until_complete(asyncio.wait(tasks))
+            tasks = asyncio.all_tasks(self.loop)
         self.loop.close()
