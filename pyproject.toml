@@ -1,0 +1,35 @@
+[tool.poetry]
+name = "waspy"
+version = "0.42.1"
+description = "Async Microservices Framework"
+authors = ["Nick Humrich <nhumrich@canopytax.com>", "Jared Mackey <jmackey@canopytax.com>"]
+license = "Apache-2.0"
+
+repository = 'https://github.com/wasp/waspy'
+homepage = 'https://github.com/wasp/waspy'
+
+readme = 'README.md'
+
+classifiers = [
+    'Development Status :: 3 - Alpha',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: Apache Software License',
+    'Natural Language :: English',
+    'Operating System :: POSIX',
+    'Programming Language :: Python :: 3.5',
+    'Programming Language :: Python :: 3.6',
+    'Programming Language :: Python :: 3.7',
+]
+keywords = ['wasp', 'async', 'asyncio', 'rest framework', 'rabbitmq', 'microservices']
+
+include = ["waspy/**/*.py"]
+exclude = ["tests/**/*.py", "examples/**/*.py"]
+
+[tool.poetry.dependencies]
+python = "^3.5"
+httptools = "0.0.10"
+aioamqp = "0.11.0"
+PyYAML = "3.13"
+aenum = "1.4.5"
+
+[tool.poetry.dev-dependencies]

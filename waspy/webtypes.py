@@ -1,5 +1,6 @@
 from collections import defaultdict
 from urllib import parse
+
 from aenum import extend_enum
 
 from waspy import exceptions
