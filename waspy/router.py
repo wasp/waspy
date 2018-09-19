@@ -1,9 +1,7 @@
 import warnings
-
 from contextlib import contextmanager
 from http import HTTPStatus
 from typing import Callable, Union
-
 from enum import Enum
 
 from .exceptions import ResponseError

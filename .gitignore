@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Pytest
+.pytest_cache
+
 # C extensions
 *.so
 
@@ -87,3 +90,9 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# Intellij
+.idea/
+
+# Poetry
+pyproject.lock

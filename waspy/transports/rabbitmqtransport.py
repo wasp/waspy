@@ -414,7 +414,6 @@ class RabbitMQTransport(TransportABC, RabbitChannelMixIn):
         except ValueError:
             path = route
             method = 'POST'
-
         path = path.replace('.', '/')
         # need to use `?` to represent `.` in rabbit
         # since its not valid in a path, it should work correctly everywhere
