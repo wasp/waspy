@@ -33,6 +33,7 @@ note: all alpha features are complete, but I am still in the process of adding m
 Wish List:
 - [ ] Transport classes for nats (nats.io)
 - [ ] Transport classes for kafka
+- [ ] Transport classes for gRPC 
 - [ ] pattern for synchronous "worker-tier"
 - [x] configuration package
 - [ ] auto-reloading when in debug mode
