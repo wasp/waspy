@@ -1,12 +1,13 @@
 from collections import defaultdict
 from urllib import parse
+from http import HTTPStatus, cookies
+import uuid
 
 from aenum import extend_enum
 
 from waspy import exceptions
 from waspy.parser import parsers
 from .router import Methods
-from http import HTTPStatus, cookies
 
 extend_enum(HTTPStatus, 'INVALID_REQUEST', (430, 'Invalid Request',
                                             'Request was syntactically sound, '
@@ -157,7 +158,7 @@ class Request(Parseable):
         self._method = None
         self.headers = headers
         self.path = path
-        self.correlation_id = correlation_id
+        self.correlation_id = correlation_id or str(uuid.uuid4())
         self.method = method  # this is a property setter
         self.query_string = query_string
         self._query_params = None

@@ -6,6 +6,8 @@ from functools import wraps
 from typing import List, Union, Iterable
 from http import HTTPStatus
 from concurrent.futures import CancelledError
+from contextvars import ContextVar, copy_context
+from copy import copy
 
 from waspy.parser import ParserABC, JSONParser, parsers as app_parsers
 from ._cors import CORSHandler
@@ -16,6 +18,7 @@ from .router import Router
 from .transports.transportabc import TransportABC
 from .transports.rabbitmqtransport import NackMePleaseError
 from .configuration import Config, ConfigError
+from .ctx import request_context
 from . import errorlogging
 
 
@@ -172,6 +175,7 @@ class Application:
         # Get handler
         try:
             try:
+                self._set_ctx(request)
                 handler = self.router.get_handler_for_request(request)
                 request.app = self
                 response = await handler(request)
@@ -203,6 +207,11 @@ class Application:
             # The response shouldnt really ever be used
             return None
 
+        except asyncio.TimeoutError:
+            response = Response(status=HTTPStatus.GATEWAY_TIMEOUT,
+                                body={'message': 'Gateway Timeout'})
+            response.app = self
+
         except NackMePleaseError:
             """ See message where this error is defined """
             raise
@@ -210,7 +219,7 @@ class Application:
         except Exception:
             exc_info = sys.exc_info()
             self.logger.log_exception(request, exc_info)
-            response = Response(status=500,
+            response = Response(status=HTTPStatus.INTERNAL_SERVER_ERROR,
                                 body={'message': 'Server Error'})
             response.app = self
         if not response.correlation_id:
@@ -223,6 +232,12 @@ class Application:
         response.headers = {**self.default_headers, **response.headers}
 
         return response
+
+    def _set_ctx(self, request):
+        ctx = {'correlation_id': request.correlation_id,
+               'ctx_headers':
+                   {k: v for k, v in request.headers.items() if k.startswith('x-ctx-')}}
+        request_context.set(ctx)
 
     async def _wrap_handlers(self):
         handler_gen = self.router._get_and_wrap_routes()

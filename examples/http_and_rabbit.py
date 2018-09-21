@@ -1,6 +1,13 @@
+import os
 
-from waspy import Application, Response, Request
+from waspy import Application, Response, Request, Config
 from waspy.transports import RabbitMQTransport, HTTPTransport
+
+os.environ['WASPY_CONFIG_LOCATION'] = os.path.join(os.path.dirname(__file__),
+                                                   'config.yaml')
+
+config = Config().from_file(os.path.join(os.path.dirname(__file__),
+                                         'config.yaml'))
 
 rabbit = RabbitMQTransport(
     url='127.0.0.1',  # requires rabbitmq running locally (docker?)
@@ -13,7 +20,7 @@ rabbit = RabbitMQTransport(
 )
 http = HTTPTransport(port=8080)
 
-app = Application((rabbit, http), debug=False)
+app = Application((rabbit, http), config=config, debug=False)
 
 async def on_startup(app):
     await rabbit.bind_to_exchange(exchange='amq.topic', routing_key='#')

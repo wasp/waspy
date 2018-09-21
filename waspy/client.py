@@ -1,10 +1,12 @@
 import json
 from urllib import parse
 import uuid
+import warnings
 
 import asyncio
 
 from .webtypes import QueryParams, Request, Methods
+from .ctx import request_context
 
 
 class Client:
@@ -57,13 +59,22 @@ class Client:
             query_string = str(query_params)
         else:
             query_string = ''
+        headers = headers or {}
 
+        ctx = request_context.get()
         if context:
-            if not correlation_id:
-                correlation_id = context.correlation_id
+            warnings.warn("Passing in a context to waspy client is deprecated. "
+                          "Passed in context will be ignored", DeprecationWarning)
 
         if not correlation_id:
-            correlation_id = str(uuid.uuid4())
+            correlation_id = ctx['correlation_id']
+
+        headers = {**headers, **ctx['ctx_headers']}
+        print('hdrs', headers)
+        exchange = headers.get('x-ctx-exchange-override', None)
+        if exchange:
+            kwargs['exchange'] = exchange
+
         if isinstance(body, str):
             body = body.encode()
         response = asyncio.wait_for(

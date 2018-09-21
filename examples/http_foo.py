@@ -7,7 +7,7 @@ os.environ['WASPY_CONFIG_LOCATION'] = os.path.join(os.path.dirname(__file__),
 import asyncio
 from waspy import Application
 # from waspy.transports import HTTPTransport
-from waspy.transports.httptoolstransport import HTTPTransport
+from waspy.transports.httptransport import HTTPTransport
 from waspy.configuration import Config
 import uvloop
 
@@ -23,13 +23,16 @@ app = Application(HTTPTransport(port=PORT, prefix='/api'), config=config)
 async def handle_hello(request):
     return {'hello': 'world'}
 
+
 async def handle_foo(request):
     fooid = request.path_params.get('fooid')
     return {'foo': fooid}
 
+
 async def handle_foo_bar(request):
     foobarid = request.path_params.get('foobarid')
     return {'foo': {'bar': {'id': foobarid}}}
+
 
 async def handle_bar(request):
     fooid = request.path_params.get('fooid')

@@ -1,2 +1,3 @@
+debug: true
 http:
   port: 8080
