@@ -220,17 +220,22 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         if content_type:
             properties['content_type'] = content_type
 
-        try:
-            await self.channel.basic_publish(exchange_name=exchange,
-                                             routing_key=path,
-                                             properties=properties,
-                                             payload=body,
-                                             mandatory=mandatory)
-        except aioamqp.AmqpClosedConnection as e:
-            """ Usually this means that rabbitmq closed the connection, because something was bad,
-                such as the exchange name, or something """
-            self._handle_rabbit_error(e)
-            raise
+        for i in range(3):  # retry messages on closed channels
+            print(i)
+            try:
+                await self.channel.basic_publish(exchange_name=exchange,
+                                                 routing_key=path,
+                                                 properties=properties,
+                                                 payload=body,
+                                                 mandatory=mandatory)
+            except aioamqp.ChannelClosed as e:
+                """ Usually this means that rabbitmq closed the connection, because something was bad,
+                    such as the exchange name, or something """
+                await self._handle_rabbit_error(e)
+                if i == 2:
+                    raise
+            else:
+                break
 
         if method != 'PUBLISH':
             future = asyncio.Future()

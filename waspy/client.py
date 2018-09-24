@@ -70,7 +70,6 @@ class Client:
             correlation_id = ctx['correlation_id']
 
         headers = {**headers, **ctx['ctx_headers']}
-        print('hdrs', headers)
         exchange = headers.get('x-ctx-exchange-override', None)
         if exchange:
             kwargs['exchange'] = exchange
