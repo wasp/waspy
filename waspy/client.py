@@ -1,6 +1,5 @@
 import json
 from urllib import parse
-import uuid
 import warnings
 
 import asyncio
@@ -70,9 +69,10 @@ class Client:
             correlation_id = ctx['correlation_id']
 
         headers = {**headers, **ctx['ctx_headers']}
+
         exchange = headers.get('x-ctx-exchange-override', None)
         if exchange:
-            kwargs['exchange'] = exchange
+            kwargs['exchange'] = 'amq.headers'
 
         if isinstance(body, str):
             body = body.encode()
