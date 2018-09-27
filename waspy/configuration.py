@@ -1,5 +1,6 @@
 import os
 import yaml
+import pathlib
 
 CONFIG_LOCATION = os.getenv('WASPY_CONFIG_LOCATION')
 
@@ -54,9 +55,13 @@ class Config:
     def _load_config(self, filepath=None):
         if filepath is None:
             if CONFIG_LOCATION is None:
-                raise ValueError(NO_CONFIG_LOCATION_ERROR_MESSAGE)
-            filepath = os.path.abspath(CONFIG_LOCATION)
-        with open(filepath, 'r') as f:
+                filepath = pathlib.Path.cwd()
+            else:
+                filepath = pathlib.Path(CONFIG_LOCATION).absolute()
+        else:
+            filepath = pathlib.Path(filepath)
+
+        with filepath.open('r') as f:
             config = yaml.safe_load(f)
             self.default_options = config
 
