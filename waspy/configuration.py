@@ -55,12 +55,11 @@ class Config:
     def _load_config(self, filepath=None):
         if filepath is None:
             if CONFIG_LOCATION is None:
-                filepath = pathlib.Path.cwd()
+                filepath = pathlib.Path.cwd() / 'config.yaml'
             else:
                 filepath = pathlib.Path(CONFIG_LOCATION).absolute()
         else:
             filepath = pathlib.Path(filepath)
-
         with filepath.open('r') as f:
             config = yaml.safe_load(f)
             self.default_options = config
