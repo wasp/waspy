@@ -32,3 +32,7 @@ aenum = "1.4.5"
 
 [tool.poetry.dev-dependencies]
 uvloop = "*"
+pytest = "*"
+requests = "*"
+coverage = "*"
+pytest-cov = "*"

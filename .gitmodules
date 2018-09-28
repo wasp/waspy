@@ -1,0 +1,3 @@
+[submodule "waspy-example"]
+	path = waspy-example
+	url = https://github.com/wasp/waspy-example

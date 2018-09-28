@@ -9,7 +9,7 @@ from concurrent.futures import CancelledError
 from contextvars import ContextVar, copy_context
 from copy import copy
 
-from waspy.parser import ParserABC, JSONParser, parsers as app_parsers
+from .parser import ParserABC, JSONParser, parsers as app_parsers
 from ._cors import CORSHandler
 from .client import Client
 from .webtypes import Request, Response
