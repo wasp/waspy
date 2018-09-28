@@ -24,7 +24,7 @@ jobs:
     displayName: 'Install dependencies'
 
   - script: |
-      python -m pytest --cov=waspy/ --doctest-modules --junitxml=junit/test-results.xml
+      python3 -m pytest --cov=waspy/ --doctest-modules --junitxml=junit/test-results.xml
     displayName: 'pytest'
 
   - task: PublishTestResults@2
