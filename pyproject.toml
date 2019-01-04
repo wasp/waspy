@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "waspy"
-version = "0.44.4"
+version = "0.44.5"
 description = "Async Microservices Framework"
 authors = ["Nick Humrich <nhumrich@canopytax.com>", "Jared Mackey <jmackey@canopytax.com>"]
 license = "Apache-2.0"

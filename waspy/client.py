@@ -70,7 +70,7 @@ class Client:
 
         headers = {**headers, **ctx['ctx_headers']}
 
-        exchange = headers.get('x-ctx-exchange-override', None)
+        exchange = headers.get('ctx-exchange-override', None)
         if exchange:
             kwargs['exchange'] = 'amq.headers'
 

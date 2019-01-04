@@ -236,7 +236,7 @@ class Application:
     def _set_ctx(self, request):
         ctx = {'correlation_id': request.correlation_id,
                'ctx_headers':
-                   {k: v for k, v in request.headers.items() if k.startswith('x-ctx-')}}
+                   {k: v for k, v in request.headers.items() if k.startswith('ctx-')}}
         request_context.set(ctx)
 
     async def _wrap_handlers(self):
