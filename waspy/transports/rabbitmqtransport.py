@@ -61,7 +61,7 @@ class RabbitChannelMixIn:
         channel = await self._protocol.channel()
         self.channels[channel.channel_id] = channel
         return channel
-    
+
     async def close_channel(self, channel: aioamqp.channel.Channel) -> None:
         del self.channels[channel.channel_id]
         await channel.close()
@@ -70,7 +70,7 @@ class RabbitChannelMixIn:
         for channel in self.channels.values():
             if channel.is_open:
                 await channel.close()
-        
+
         self.channels = {}
         if self._protocol and self._protocol.state != protocol.CLOSED:
             if self._protocol.state == protocol.CLOSING:
@@ -221,7 +221,8 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
             properties['content_type'] = content_type
 
         for i in range(3):  # retry messages on closed channels
-            print(i)
+            if i > 0:
+                logger.info(f'Publish re-attempt #{i}')
             try:
                 await self.channel.basic_publish(exchange_name=exchange,
                                                  routing_key=path,
