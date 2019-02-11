@@ -351,7 +351,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
             # headers += 'Connection: keep-alive\r\n'
             # headers += 'Keep-Alive: timeout=5, max=50\r\n'
 
-        if response.raw_body:
+        if response.status.value != 204 and response.raw_body:
             headers += 'Content-Type: {}\r\n'.format(response.content_type)
             headers += 'Content-Length: {}\r\n'.format(len(response.raw_body))
             if ('transfer-encoding' in response.headers
@@ -363,7 +363,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
         else:
             headers += 'Content-Length: {}\r\n'.format(0)
         for header, value in response.headers.items():
-            if header in ('Content-Length', 'content-lenth'):
+            if header in ('Content-Length', 'content-length'):
                 continue
             headers += '{header}: {value}\r\n'.format(
                 header=header, value=value)
