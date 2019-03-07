@@ -353,7 +353,8 @@ class _HTTPServerProtocol(asyncio.Protocol):
 
         if response.status.value != 204 and response.raw_body:
             headers += 'Content-Type: {}\r\n'.format(response.content_type)
-            headers += 'Content-Length: {}\r\n'.format(len(response.raw_body))
+            content_length = len(response.raw_body)
+            headers += 'Content-Length: {}\r\n'.format(content_length)
             if ('transfer-encoding' in response.headers
                     or 'Transfer-Encoding' in response.headers):
                 print('Httptoolstransport currently doesnt support '
@@ -361,7 +362,8 @@ class _HTTPServerProtocol(asyncio.Protocol):
                 response.headers.pop('transfer-encoding', None)
                 response.headers.pop('Transfer-Encoding', None)
         else:
-            headers += 'Content-Length: {}\r\n'.format(0)
+            content_length = 0
+            headers += 'Content-Length: {}\r\n'.format(content_length)
         for header, value in response.headers.items():
             if header in ('Content-Length', 'content-length'):
                 continue
@@ -369,7 +371,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
                 header=header, value=value)
 
         result = headers.encode('latin-1') + b'\r\n'
-        if response.raw_body:
+        if response.raw_body and content_length > 0:
             result += response.raw_body
 
         try:
