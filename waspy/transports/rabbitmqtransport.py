@@ -269,7 +269,7 @@ class RabbitMQClientTransport(ClientTransportABC, RabbitChannelMixIn):
         headers = properties.headers
         status = headers.pop('Status')
 
-        if properties.content_length <= 0:
+        if properties.headers.get('content-length', 1) in (0, '0'):
             body = None
 
         response = Response(headers=headers,
