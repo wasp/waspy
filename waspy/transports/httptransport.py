@@ -314,7 +314,7 @@ class _HTTPServerProtocol(asyncio.Protocol):
         if url.query:
             # query = urllib.parse.unquote(url.query.decode('latin-1'))
             self.request.query_string = url.query.decode('latin-1')
-        path = urllib.parse.unquote(url.path.decode('latin-1'))
+        path = urllib.parse.unquote_plus(url.path.decode('latin-1'))
         if path.startswith(self._parent.prefix):
             path = path[len(self._parent.prefix):]
         self.request.path = path
