@@ -50,7 +50,7 @@ class _HTTPClientConnection:
 
     async def get_response(self):
         while True:
-            data = await self.reader.read(1064)
+            data = await self.reader.read(65536)
             self.http_parser.feed_data(data)
             if self._done:
                 return self.response
